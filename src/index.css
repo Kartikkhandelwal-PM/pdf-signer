@@ -1,0 +1,177 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: 'Plus Jakarta Sans Variable', 'Inter Variable', sans-serif;
+    --font-sans: 'Inter Variable', sans-serif;
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-brand-pink: var(--brand-pink);
+    --color-brand-orange: var(--brand-orange);
+    --color-brand-teal: var(--brand-teal);
+    --radius-sm: calc(var(--radius) * 0.55);
+    --radius-md: calc(var(--radius) * 0.75);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.35);
+    --radius-2xl: calc(var(--radius) * 1.7);
+    --radius-3xl: calc(var(--radius) * 2.1);
+    --radius-4xl: calc(var(--radius) * 2.5);
+}
+
+:root {
+    --background: #f5f8fa;
+    --foreground: #14202a;
+    --card: #ffffff;
+    --card-foreground: #14202a;
+    --popover: #ffffff;
+    --popover-foreground: #14202a;
+    --primary: #1d6e96;
+    --primary-foreground: #ffffff;
+    --secondary: #edf3f6;
+    --secondary-foreground: #3c4f5c;
+    --muted: #edf3f6;
+    --muted-foreground: #5c7180;
+    --accent: #edf3f6;
+    --accent-foreground: #1d6e96;
+    --destructive: #f43f5e;
+    --success: #22c55e;
+    --success-foreground: #ffffff;
+    --warning: #f59e0b;
+    --warning-foreground: #ffffff;
+    /* brand-pink now carries the logo's coral, not an actual pink — kept the variable name so
+       every existing "from-primary to-brand-pink" gradient across the app updates automatically. */
+    --brand-pink: #f1685a;
+    --brand-orange: #ff9d47;
+    --brand-teal: #14b8a6;
+    --border: #e1eaef;
+    --input: #e1eaef;
+    --ring: #1d6e96;
+    --chart-1: #1d6e96;
+    --chart-2: #f1685a;
+    --chart-3: #ff9d47;
+    --chart-4: #14b8a6;
+    --chart-5: #22c55e;
+    --radius: 0.625rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #3c4f5c;
+    --sidebar-primary: #1d6e96;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #edf3f6;
+    --sidebar-accent-foreground: #14202a;
+    --sidebar-border: #e7eff3;
+    --sidebar-ring: #1d6e96;
+}
+
+.dark {
+    --background: #0e171d;
+    --foreground: #e7f0f4;
+    --card: #16222a;
+    --card-foreground: #e7f0f4;
+    --popover: #16222a;
+    --popover-foreground: #e7f0f4;
+    --primary: #4fa8d8;
+    --primary-foreground: #0b1a22;
+    --secondary: #1e2e37;
+    --secondary-foreground: #e7f0f4;
+    --muted: #1e2e37;
+    --muted-foreground: #93a9b4;
+    --accent: #223842;
+    --accent-foreground: #7fc4ea;
+    --destructive: #fb7185;
+    --success: #4ade80;
+    --success-foreground: #0f2016;
+    --warning: #fbbf24;
+    --warning-foreground: #241a02;
+    --brand-pink: #ff8c7e;
+    --brand-orange: #ffb066;
+    --brand-teal: #2dd4bf;
+    --border: rgba(255,255,255,.09);
+    --input: rgba(255,255,255,.13);
+    --ring: #4fa8d8;
+    --chart-1: #4fa8d8;
+    --chart-2: #ff8c7e;
+    --chart-3: #ffb066;
+    --chart-4: #2dd4bf;
+    --chart-5: #4ade80;
+    --sidebar: #101b21;
+    --sidebar-foreground: #c7d8df;
+    --sidebar-primary: #4fa8d8;
+    --sidebar-primary-foreground: #0b1a22;
+    --sidebar-accent: #1e2e37;
+    --sidebar-accent-foreground: #e7f0f4;
+    --sidebar-border: rgba(255,255,255,.08);
+    --sidebar-ring: #4fa8d8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+/* Two effects tw-animate-css has no preset for — an SVG stroke "drawing" itself in (paired
+   with pathLength=1 so any path/circle can use the same 0-to-1 offset), and a small radial
+   burst of dots. Everything else in the sign-document success/processing flow reuses the
+   existing animate-in/fade-in/zoom-in/delay-* utilities from tw-animate-css. */
+@keyframes stroke-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes burst-out {
+  from {
+    transform: translate(0, 0) scale(0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--burst-x), var(--burst-y)) scale(1);
+    opacity: 0;
+  }
+}
