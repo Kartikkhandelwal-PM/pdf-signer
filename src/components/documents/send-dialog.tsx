@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -16,6 +15,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { EmailPreview } from '@/components/documents/email-preview'
@@ -95,9 +95,12 @@ function insertAtCursor(el: HTMLTextAreaElement, token: string, value: string, o
 
 export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
   const { sendDocuments } = useDocuments()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<number | null>(null)
+  const closeTimerRef = useRef<number | null>(null)
 
   const isBatch = documents.length > 1
   const singleDoc = documents.length === 1 ? documents[0] : null
@@ -122,6 +125,10 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current)
       timerRef.current = null
+    }
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
     }
   }
 
@@ -273,6 +280,12 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
         stopTimer()
         sendDocuments(updates)
         setPhase('sent')
+        // Once the tick has registered, close and put the user where the delivery is now on
+        // record — unless that is already the page they are on.
+        closeTimerRef.current = window.setTimeout(() => {
+          onOpenChange(false)
+          if (pathname !== '/sent') navigate('/sent')
+        }, 1100)
         toast.success(total === 1 ? `Email sent to ${outgoing[0].email}` : `${pluralize(total, 'email')} sent`)
       }
     }, step)
@@ -624,21 +637,8 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
           <DeliveryPanel phase={phase} outgoing={outgoing} delivered={delivered} />
         )}
 
-        <DialogFooter className="-mx-0 -mb-0 gap-3 rounded-b-2xl border-t border-border bg-secondary/40 px-6 py-3.5 sm:items-center sm:justify-between">
-          {phase === 'sent' ? (
-            <>
-              <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-success">
-                <CheckCircle2 className="size-3.5" />
-                Delivery complete
-              </span>
-              <Button
-                className="h-10 rounded-[10px] border-none bg-primary px-6 font-semibold hover:bg-primary/90"
-                onClick={() => onOpenChange(false)}
-              >
-                Done
-              </Button>
-            </>
-          ) : (
+        {phase !== 'sent' && (
+          <DialogFooter className="-mx-0 -mb-0 gap-3 rounded-b-2xl border-t border-border bg-secondary/40 px-6 py-3.5 sm:items-center sm:justify-between">
             <>
               <span className="hidden items-center gap-1.5 font-mono text-[11px] text-muted-foreground sm:flex">
                 <Paperclip className="size-3 shrink-0" />
@@ -680,8 +680,8 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
                 </Button>
               </div>
             </>
-          )}
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

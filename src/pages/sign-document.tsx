@@ -32,6 +32,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  MailCheck,
   Plus,
   PenLine,
   Search,
@@ -1003,7 +1004,14 @@ function DocumentPreviewCard({
 export function SignDocumentPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { addDocuments, replaceDocument, saveDraftFile, getDraftFile, clearDraftFile } = useDocuments()
+  const {
+    documents: allDocuments,
+    addDocuments,
+    replaceDocument,
+    saveDraftFile,
+    getDraftFile,
+    clearDraftFile,
+  } = useDocuments()
   // Arriving from "Resume signing" on a pending/draft document (All documents) — we never
   // stored its original bytes, so the user still has to re-add the file, but finishing it here
   // replaces that stale row instead of leaving a duplicate behind.
@@ -1027,6 +1035,15 @@ export function SignDocumentPage() {
   const [signPhase, setSignPhase] = useState<BatchPhase>('setup')
   const [signStep, setSignStep] = useState(0)
   const [signedResult, setSignedResult] = useState<SignedDocument | null>(null)
+
+  // Read the delivery state back from the store rather than the local snapshot, so the success
+  // screens notice when the send dialog has actually delivered something.
+  const signedResultSentTo = signedResult
+    ? allDocuments.find((doc) => doc.id === signedResult.id)?.sentTo
+    : undefined
+  const batchSentCount = batchResultDocs.filter(
+    (doc) => allDocuments.find((stored) => stored.id === doc.id)?.sentTo,
+  ).length
   const [docHash, setDocHash] = useState('')
   const pendingDocRef = useRef<SignedDocument | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -2091,18 +2108,44 @@ export function SignDocumentPage() {
                 </div>
               </div>
 
-              <div className="flex w-full animate-in items-center gap-2.5 rounded-[10px] bg-secondary/50 p-3.5 text-[12px] text-muted-foreground fade-in-0 delay-200 duration-500">
-                <Mail className="size-4 shrink-0 text-primary" />
-                Nothing's been emailed yet — send it to your clients whenever you're ready.
+              <div
+                className={cn(
+                  'flex w-full animate-in items-center gap-2.5 rounded-[10px] p-3.5 text-[12px] fade-in-0 delay-200 duration-500',
+                  batchSentCount > 0
+                    ? 'border border-success/25 bg-success/[0.06] text-success'
+                    : 'bg-secondary/50 text-muted-foreground',
+                )}
+              >
+                {batchSentCount > 0 ? (
+                  <>
+                    <MailCheck className="size-4 shrink-0" />
+                    {batchSentCount} of {batchResultDocs.length} files emailed to clients.
+                  </>
+                ) : (
+                  <>
+                    <Mail className="size-4 shrink-0 text-primary" />
+                    Nothing's been emailed yet — send it to your clients whenever you're ready.
+                  </>
+                )}
               </div>
 
               <div className="flex w-full animate-in flex-col items-center gap-3 fade-in-0 delay-300 duration-500">
                 <Button
-                  className="h-11 w-full gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                  variant={batchSentCount === batchResultDocs.length ? 'ghost' : 'default'}
+                  className={cn(
+                    'h-11 w-full gap-1.5 rounded-[10px] font-semibold',
+                    batchSentCount === batchResultDocs.length
+                      ? 'bg-secondary hover:bg-secondary/70'
+                      : 'border-none bg-linear-to-br from-primary to-[#2f93c0] shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95',
+                  )}
                   onClick={() => setSendTargets(batchResultDocs)}
                 >
                   <Send className="size-4" />
-                  Send to clients
+                  {batchSentCount === batchResultDocs.length
+                    ? 'Send again'
+                    : batchSentCount > 0
+                      ? 'Send the remaining files'
+                      : 'Send to clients'}
                 </Button>
                 <div className="flex w-full items-center gap-2.5">
                   <Button
@@ -3161,13 +3204,31 @@ export function SignDocumentPage() {
             </div>
 
             <div className="flex w-full animate-in flex-col items-center gap-3 fade-in-0 delay-300 duration-500">
-              <Button
-                className="h-11 w-full gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
-                onClick={() => setSendTargets([signedResult])}
-              >
-                <Send className="size-4" />
-                Send to client
-              </Button>
+              {/* Once it has gone out, this screen has to say so — otherwise the same button
+                  invites a second send of a document the client already has. */}
+              {signedResultSentTo ? (
+                <div className="flex w-full items-center gap-2.5 rounded-[10px] border border-success/25 bg-success/[0.06] p-3.5">
+                  <MailCheck className="size-4 shrink-0 text-success" />
+                  <span className="min-w-0 flex-1 text-[12.5px] font-medium text-success">
+                    Sent to <span className="font-mono">{signedResultSentTo}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSendTargets([signedResult])}
+                    className="shrink-0 text-[12px] font-semibold text-success hover:underline"
+                  >
+                    Send again
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  className="h-11 w-full gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                  onClick={() => setSendTargets([signedResult])}
+                >
+                  <Send className="size-4" />
+                  Send to client
+                </Button>
+              )}
               <div className="flex w-full items-center gap-2.5">
                 <Button
                   variant="ghost"
