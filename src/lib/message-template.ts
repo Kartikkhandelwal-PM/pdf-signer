@@ -6,28 +6,27 @@ export interface TemplateVars {
   clientName: string
   documentName: string
   firmName: string
-  password?: string
+  /** How the PDF password is formed (e.g. "PAN in lowercase + DOB") — never the password itself. */
+  passwordHint?: string
 }
 
 export const MESSAGE_VARIABLES: { token: string; label: string }[] = [
   { token: '{{client_name}}', label: 'Client name' },
   { token: '{{document_name}}', label: 'Document name' },
   { token: '{{firm_name}}', label: 'Firm name' },
-  { token: '{{password}}', label: 'Password' },
 ]
 
 export const DEFAULT_SUBJECT_TEMPLATE = '{{document_name}} — signed document from {{firm_name}}'
 export const DEFAULT_BODY_TEMPLATE =
   'Hi {{client_name}},\n\nPlease find attached {{document_name}}.\n\nRegards,\n{{firm_name}}'
 
-// Appended to the body (not baked into DEFAULT_BODY_TEMPLATE) only when the sender has chosen
-// to include the password in this email — see the "Include password" toggle next to it.
-export const PASSWORD_LINE_TEMPLATE = 'PDF password: {{password}}'
+// The actual PDF password is never emailed. What goes out is a hint describing how the client
+// can construct it themselves (PAN, date of birth and so on), rendered in its own highlighted
+// block in the email — see PASSWORD_HINT_PRESETS in the send flow.
 
 export function renderTemplate(template: string, vars: TemplateVars): string {
   return template
     .replaceAll('{{client_name}}', vars.clientName.trim() || 'there')
     .replaceAll('{{document_name}}', vars.documentName)
     .replaceAll('{{firm_name}}', vars.firmName)
-    .replaceAll('{{password}}', vars.password ?? '')
 }

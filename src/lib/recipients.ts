@@ -3,8 +3,6 @@
 // uploaded files (the popular `xlsx`/SheetJS package has unpatched prototype-pollution and
 // ReDoS advisories).
 
-export const DEFAULT_FIRM_NAME = 'KDK Softwares'
-
 export interface RecipientRow {
   fileName: string
   clientName: string
