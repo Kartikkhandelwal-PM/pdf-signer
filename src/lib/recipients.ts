@@ -58,10 +58,13 @@ function parseCsvLine(line: string): string[] {
   return cells.map((cell) => cell.trim())
 }
 
-/** Builds a downloadable CSV template, one row per document, prefilled with what's already known. */
-export function buildRecipientTemplateCsv(docs: { name: string; password?: string }[]): string {
-  const header = ['File Name', 'Client Name', 'Client Email', 'Password']
-  const rows = docs.map((doc) => [doc.name, '', '', doc.password ?? ''])
+/** Builds a downloadable CSV template, one row per document, prefilled with what's already
+ *  known about each file's client — so the sender fills in gaps instead of the whole sheet. */
+export function buildRecipientTemplateCsv(
+  docs: { name: string; clientName?: string; email?: string }[],
+): string {
+  const header = ['File Name', 'Client Name', 'Client Email']
+  const rows = docs.map((doc) => [doc.name, doc.clientName ?? '', doc.email ?? ''])
   return [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n')
 }
 

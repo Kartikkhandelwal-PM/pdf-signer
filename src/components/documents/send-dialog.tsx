@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  FileSpreadsheet,
+  Info,
   Loader2,
   Lock,
   MailCheck,
@@ -12,6 +14,7 @@ import {
   RotateCw,
   Send,
   Upload,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -51,7 +54,6 @@ import {
 import { cn } from '@/lib/utils'
 import type { SignedDocument } from '@/types'
 
-type SendMode = 'single' | 'csv'
 type Phase = 'compose' | 'sending' | 'sent'
 
 interface SendDialogProps {
@@ -100,7 +102,6 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
   const isBatch = documents.length > 1
   const singleDoc = documents.length === 1 ? documents[0] : null
 
-  const [mode, setMode] = useState<SendMode>('single')
   const [recipient, setRecipient] = useState('')
   const [recipientName, setRecipientName] = useState('')
   const [subject, setSubject] = useState(DEFAULT_SUBJECT_TEMPLATE)
@@ -134,9 +135,10 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
     const commonRecipient = documents.every((doc) => doc.sentTo && doc.sentTo === documents[0].sentTo)
       ? documents[0].sentTo
       : undefined
-    setMode('single')
     setRecipient(singleDoc?.sentTo ?? commonRecipient ?? '')
-    setRecipientName(singleDoc?.recipientName ?? singleDoc?.client ?? '')
+    // Only ever prefilled from a name the sender actually typed on a previous send — the app
+    // has no other source for a client's name, and a guessed one ends up in the greeting.
+    setRecipientName(singleDoc?.recipientName ?? '')
     setSubject(DEFAULT_SUBJECT_TEMPLATE)
     setBody(DEFAULT_BODY_TEMPLATE)
     setPasswordHint(PASSWORD_HINT_PRESETS[0].hint)
@@ -151,6 +153,9 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  // An uploaded list, once accepted, is the single source of who gets what — there is no mode
+  // to choose, only "is there a list or not".
+  const listLoaded = csvFileName !== ''
   const hasProtected = documents.some((doc) => doc.passwordProtected)
   const coveredIds = new Set(csvMatches.map((match) => match.docId))
   const missingCount = documents.filter((doc) => !coveredIds.has(doc.id)).length
@@ -159,7 +164,7 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
   // Every email that will actually leave the outbox. One client can own several files, so CSV
   // rows are grouped by address — they get a single email with all their documents attached.
   const outgoing = useMemo<OutgoingEmail[]>(() => {
-    if (mode !== 'csv') {
+    if (!listLoaded) {
       return [{ email: recipient.trim(), clientName: recipientName, docs: documents }]
     }
     const docById = new Map(documents.map((doc) => [doc.id, doc]))
@@ -174,7 +179,7 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
       byEmail.set(key, entry)
     }
     return [...byEmail.values()]
-  }, [mode, csvMatches, documents, recipient, recipientName])
+  }, [listLoaded, csvMatches, documents, recipient, recipientName])
 
   const activeIndex = Math.min(previewIndex, Math.max(outgoing.length - 1, 0))
   const preview = outgoing[activeIndex] as OutgoingEmail | undefined
@@ -188,13 +193,13 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
   }
 
   const recipientError =
-    submitted && mode === 'single' && !isValidEmail(recipient)
+    submitted && !listLoaded && !isValidEmail(recipient)
       ? recipient.trim().length === 0
         ? 'Enter the client email this should go to.'
         : "That doesn't look like a valid email address."
       : null
 
-  const canSend = mode === 'csv' ? csvMatches.length > 0 : isValidEmail(recipient)
+  const canSend = listLoaded ? csvMatches.length > 0 : isValidEmail(recipient)
 
   async function handleCsvFile(file: File) {
     const text = await file.text()
@@ -215,15 +220,35 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
     }
   }
 
+  function clearList() {
+    setCsvFileName('')
+    setCsvMatches([])
+    setCsvUnmatched([])
+    setCsvErrors([])
+    setPreviewIndex(0)
+  }
+
+  /** The template goes out prefilled with what the sender has actually told us before — the
+   *  name and address used on a previous send — and blank everywhere else. */
+  function handleDownloadTemplate() {
+    downloadCsv(
+      'recipient-list.csv',
+      buildRecipientTemplateCsv(
+        documents.map((doc) => ({ name: doc.name, clientName: doc.recipientName, email: doc.sentTo })),
+      ),
+    )
+    toast.success('Template downloaded with the addresses already on record')
+  }
+
   function handleSend() {
     setSubmitted(true)
     if (!canSend) {
-      if (mode === 'csv') toast.error('Upload a filled-in recipient list first')
+      if (listLoaded) toast.error('No file in that list matched — fix it or remove it')
       return
     }
 
     const updates: SendUpdate[] =
-      mode === 'csv'
+      listLoaded
         ? csvMatches.map((match) => ({
             id: match.docId,
             sentTo: match.email,
@@ -287,32 +312,80 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
             {/* ---------- Compose ---------- */}
             <div className="flex min-h-0 flex-col">
               <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-6 py-5">
-                {isBatch && (
-                  <div className="flex h-9 w-fit items-center gap-1 rounded-[9px] bg-secondary p-1">
-                    {(
-                      [
-                        { value: 'single', label: 'One recipient' },
-                        { value: 'csv', label: 'A recipient per file' },
-                      ] as { value: SendMode; label: string }[]
-                    ).map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setMode(option.value)}
+                {listLoaded ? (
+                  /* An uploaded list decides every recipient, so it replaces the email field
+                     outright — the two are never on screen together looking equally in charge. */
+                  <div className="flex flex-col gap-2">
+                    <div
+                      className={cn(
+                        'flex items-center gap-3 rounded-[11px] border p-3',
+                        csvMatches.length > 0
+                          ? 'border-success/30 bg-success/[0.05]'
+                          : 'border-destructive/30 bg-destructive/[0.04]',
+                      )}
+                    >
+                      <div
                         className={cn(
-                          'h-7 rounded-[7px] px-4 text-[12px] font-semibold transition-colors',
-                          mode === option.value
-                            ? 'bg-linear-to-br from-primary to-[#2f93c0] text-white'
-                            : 'text-muted-foreground hover:text-foreground',
+                          'flex size-9 shrink-0 items-center justify-center rounded-[9px]',
+                          csvMatches.length > 0
+                            ? 'bg-success/12 text-success'
+                            : 'bg-destructive/10 text-destructive',
                         )}
                       >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                        <FileSpreadsheet className="size-4" />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-[12.5px] font-semibold">{csvFileName}</span>
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {csvMatches.length > 0
+                            ? `${pluralize(outgoing.length, 'recipient')} · ${csvMatches.length} of ${documents.length} files matched`
+                            : 'No rows matched the selected files'}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5 rounded-[8px] px-2.5 text-[11.5px] font-semibold text-muted-foreground hover:text-foreground"
+                        onClick={clearList}
+                      >
+                        <X className="size-3.5" />
+                        Remove
+                      </Button>
+                    </div>
 
-                {mode === 'single' ? (
+                    {/* Two different problems, kept apart: a selected file with nobody to send
+                        it to is a warning; a spare row in the sheet is just noise. */}
+                    {missingCount > 0 && (
+                      <span className="flex items-start gap-1.5 text-[11px] leading-snug text-warning">
+                        <AlertTriangle className="mt-px size-3 shrink-0" />
+                        {missingCount === 1
+                          ? `1 of the ${documents.length} files isn't in this list, so it won't be sent.`
+                          : `${missingCount} of the ${documents.length} files aren't in this list, so they won't be sent.`}
+                      </span>
+                    )}
+
+                    {(csvUnmatched.length > 0 || csvErrors.length > 0) && (
+                      <span className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
+                        <Info className="mt-px size-3 shrink-0" />
+                        {[
+                          csvUnmatched.length > 0 &&
+                            `${pluralize(csvUnmatched.length, 'row')} in the list didn't match a selected file`,
+                          csvErrors.length > 0 && `${pluralize(csvErrors.length, 'row')} couldn't be read`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        .
+                      </span>
+                    )}
+
+                    {outgoing.length > 1 && (
+                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <ChevronRight className="size-3 shrink-0" />
+                        Step through every email with the arrows above the preview.
+                      </span>
+                    )}
+                  </div>
+                ) : (
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.3fr_1fr]">
                       <div className="flex flex-col gap-1.5">
@@ -355,72 +428,55 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
                       </span>
                     )}
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-col gap-2 rounded-[10px] border border-dashed border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate text-[12px] font-medium">
-                          {csvFileName || 'Recipient list (CSV)'}
-                        </span>
-                        <span className="truncate text-[10.5px] text-muted-foreground">
-                          {csvFileName
-                            ? `${csvMatches.length} of ${documents.length} files matched to a client`
-                            : 'Columns: file name, client name, client email'}
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 gap-1.5 rounded-[8px] bg-secondary px-2.5 text-[11.5px] font-semibold hover:bg-secondary/70"
-                          onClick={() => {
-                            downloadCsv(
-                              'recipient-list.csv',
-                              buildRecipientTemplateCsv(documents.map((doc) => ({ name: doc.name }))),
-                            )
-                            toast.success('Template downloaded')
-                          }}
-                        >
-                          <Download className="size-3.5" />
-                          Template
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".csv,text/csv"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) void handleCsvFile(file)
-                            e.target.value = ''
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 gap-1.5 rounded-[8px] border-none bg-primary px-2.5 text-[11.5px] font-semibold hover:bg-primary/90"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <Upload className="size-3.5" />
-                          {csvFileName ? 'Replace' : 'Upload'}
-                        </Button>
-                      </div>
-                    </div>
+                )}
 
-                    {(csvErrors.length > 0 || csvUnmatched.length > 0 || missingCount > 0) && csvFileName && (
-                      <span className="flex items-start gap-1.5 text-[11px] text-warning">
-                        <AlertTriangle className="mt-px size-3 shrink-0" />
-                        {[
-                          csvUnmatched.length > 0 && `${pluralize(csvUnmatched.length, 'row')} skipped`,
-                          csvErrors.length > 0 && `${pluralize(csvErrors.length, 'row')} unreadable`,
-                          missingCount > 0 && `${missingCount} not in the list`,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}{' '}
-                        — those files won't be sent.
+                {/* The bulk path: visible whenever more than one file is going out, never a mode
+                    to pick up front. The template comes back prefilled with what's on record. */}
+                {isBatch && !listLoaded && (
+                  <div className="flex flex-col gap-2.5 rounded-[11px] border border-dashed border-border bg-secondary/25 p-3 sm:flex-row sm:items-center sm:gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-card text-primary ring-1 ring-border">
+                      <FileSpreadsheet className="size-4" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-[12.5px] font-semibold">A different client for each file?</span>
+                      <span className="text-[11px] leading-snug text-muted-foreground">
+                        Upload a list and every file goes to its own client, in its own email.
                       </span>
-                    )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-[8px] bg-secondary px-2.5 text-[11.5px] font-semibold hover:bg-secondary/70"
+                        onClick={handleDownloadTemplate}
+                      >
+                        <Download className="size-3.5" />
+                        Template
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-[8px] border-none bg-primary px-2.5 text-[11.5px] font-semibold hover:bg-primary/90"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="size-3.5" />
+                        Upload list
+                      </Button>
+                    </div>
                   </div>
                 )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleCsvFile(file)
+                    e.target.value = ''
+                  }}
+                />
+
 
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="send-subject" className="text-[11.5px] font-semibold">
@@ -588,8 +644,8 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
                 <Paperclip className="size-3 shrink-0" />
                 {canSend
                   ? `${pluralize(outgoing.length, 'email')} · ${pluralize(documents.length, 'PDF')} · ${pluralize(totalPages, 'page')}`
-                  : mode === 'csv'
-                    ? 'Upload a recipient list to continue'
+                  : listLoaded
+                    ? 'No file in the list matched — fix or remove it'
                     : 'Add a client email to continue'}
               </span>
               <div className="flex items-center gap-2">
@@ -614,7 +670,7 @@ export function SendDialog({ documents, open, onOpenChange }: SendDialogProps) {
                   ) : (
                     <>
                       <Send className="size-4" />
-                      {mode === 'csv' && csvMatches.length > 0
+                      {listLoaded && csvMatches.length > 0
                         ? `Send ${pluralize(outgoing.length, 'email')}`
                         : singleDoc?.sentTo
                           ? 'Resend'
