@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { CreditCard, UserRound } from 'lucide-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppLayout } from '@/components/layout/app-layout'
@@ -52,6 +53,28 @@ function App() {
               />
             )
           })}
+          {/* Reached from the account menu in the topbar rather than the sidebar, so these
+              two aren't in allNavItems. */}
+          <Route
+            path="/profile"
+            element={
+              <ComingSoonPage
+                title="Profile"
+                description="Your account details and signing preferences."
+                icon={UserRound}
+              />
+            }
+          />
+          <Route
+            path="/subscription"
+            element={
+              <ComingSoonPage
+                title="Subscription"
+                description="Your plan, usage and billing history."
+                icon={CreditCard}
+              />
+            }
+          />
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/batch" element={<Navigate to="/sign" replace />} />
           <Route path="/signed" element={<Navigate to="/documents" replace />} />

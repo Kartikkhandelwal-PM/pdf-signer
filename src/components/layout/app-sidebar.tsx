@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import logoHorizontal from '@/assets/logo-horizontal.png'
@@ -8,6 +8,7 @@ import { allNavItems } from '@/config/nav'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -15,7 +16,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 
@@ -40,32 +40,35 @@ function SidebarBrandHeader() {
   }
 
   return (
-    <div className="flex items-center gap-2 px-1">
+    <div className="flex items-center px-1">
       {/* The logo's wordmark is baked into the PNG in fixed dark colors. The sidebar is already
           white in light mode, so the image sits directly on it; only in dark mode does it get a
           light backing plate, to stay legible against the dark sidebar background there. */}
       <div className="flex min-w-0 flex-1 items-center dark:rounded-[8px] dark:bg-white dark:px-2 dark:py-2">
         <img src={logoHorizontal} alt="PDF Signer" className="h-14 w-auto object-contain" />
       </div>
-      <SidebarTrigger className="size-8 shrink-0 rounded-[8px]" />
     </div>
   )
 }
 
-// Collapsed-only: a small arrow on the sidebar's edge, near the top, to expand it back — replaces
-// the inline button from the expanded header, which has no room to live in the narrow icon rail.
-function SidebarEdgeToggle() {
+// The one control that opens and closes the rail, pinned to the bottom of the sidebar so it
+// sits away from the navigation and stays in the same place in both states.
+function SidebarCollapseToggle() {
   const { state, toggleSidebar } = useSidebar()
-  if (state !== 'collapsed') return null
+  const collapsed = state === 'collapsed'
 
   return (
     <button
       type="button"
       onClick={toggleSidebar}
-      title="Expand sidebar"
-      className="absolute top-9 right-1.5 z-20 hidden size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-card text-muted-foreground shadow-[0_1px_3px_rgba(20,32,42,.18)] transition-colors hover:border-primary/40 hover:text-primary md:flex"
+      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      className={cn(
+        'flex h-10 items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground',
+        collapsed && 'size-11 justify-center px-0',
+      )}
     >
-      <ChevronRight className="size-3.5" />
+      {collapsed ? <ChevronsRight className="size-[18px]" /> : <ChevronsLeft className="size-[18px]" />}
+      {!collapsed && <span>Collapse</span>}
     </button>
   )
 }
@@ -75,7 +78,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarEdgeToggle />
       {/* Fixed to the same 72px as AppTopbar (see app-topbar.tsx) so the two header rows'
           bottom borders line up in a single straight line across the page. */}
       <SidebarHeader className="flex h-[72px] flex-col justify-center border-b border-sidebar-border px-3 py-0 group-data-[collapsible=icon]:px-2">
@@ -112,6 +114,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
+        <SidebarCollapseToggle />
+      </SidebarFooter>
     </Sidebar>
   )
 }

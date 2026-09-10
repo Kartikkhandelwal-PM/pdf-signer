@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Bell, ChevronDown, Plus, Search } from 'lucide-react'
+import { ChevronDown, CreditCard, LogOut, Plus, Search, Settings, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -40,7 +40,7 @@ export function AppTopbar() {
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchRef}
-          placeholder="Search documents, clients, certificates…"
+          placeholder="Search documents, recipients, certificates…"
           className="h-10 rounded-[10px] bg-secondary/60 pr-10 pl-10"
         />
         <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-[6px] border border-border bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
@@ -58,6 +58,7 @@ export function AppTopbar() {
           New signature
         </Button>
 
+        {/* Notification bell — parked until there's a real notification feed behind it.
         <Button
           variant="ghost"
           size="icon"
@@ -71,6 +72,7 @@ export function AppTopbar() {
           <Bell className="size-4.5" />
           <span className="absolute top-2 right-2 size-1.5 rounded-full bg-brand-pink ring-2 ring-background" />
         </Button>
+        */}
 
         <ModeToggle />
 
@@ -85,21 +87,44 @@ export function AppTopbar() {
               <ChevronDown className="size-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-normal">
+          <DropdownMenuContent align="end" className="w-64 p-0">
+            <DropdownMenuLabel className="px-4 py-3 font-normal">
               <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">Kartik Khandelwal</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="truncate text-[14px] font-semibold">Kartik Khandelwal</span>
+                <span className="truncate text-[12px] text-muted-foreground">
                   kartik.khandelwal@kdksoftware.com
                 </span>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/settings')}>Firm settings</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/settings')}>SMTP configuration</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/certificates')}>My certificates</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Sign out</DropdownMenuItem>
+            <DropdownMenuSeparator className="mx-0 my-0" />
+            <div className="p-1.5">
+              <DropdownMenuItem className="gap-2.5 px-2.5 py-2 text-[13.5px]" onClick={() => navigate('/profile')}>
+                <UserRound className="size-4 text-muted-foreground" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2.5 px-2.5 py-2 text-[13.5px]"
+                onClick={() => navigate('/subscription')}
+              >
+                <CreditCard className="size-4 text-muted-foreground" />
+                Subscription
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2.5 px-2.5 py-2 text-[13.5px]" onClick={() => navigate('/settings')}>
+                <Settings className="size-4 text-muted-foreground" />
+                Settings
+              </DropdownMenuItem>
+            </div>
+            <DropdownMenuSeparator className="mx-0 my-0" />
+            <div className="p-1.5">
+              <DropdownMenuItem
+                variant="destructive"
+                className="gap-2.5 px-2.5 py-2 text-[13.5px] font-medium"
+                onClick={() => toast('Signed out')}
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
