@@ -324,17 +324,25 @@ const flushCardClass =
 
 interface SettingsSectionProps {
   title: string
+  /** What this section currently amounts to, shown in the header once it's collapsed — so a
+   *  closed section still answers "what is this set to" without being opened. */
+  summary?: ReactNode
   defaultOpen?: boolean
   contentClassName?: string
   children: ReactNode
 }
 
-function SettingsSection({ title, defaultOpen = true, contentClassName, children }: SettingsSectionProps) {
+function SettingsSection({ title, summary, defaultOpen = true, contentClassName, children }: SettingsSectionProps) {
+  const [open, setOpen] = useState(defaultOpen)
+
   return (
-    <Collapsible defaultOpen={defaultOpen} className="border-b border-border last:border-b-0">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-border last:border-b-0">
       <CollapsibleTrigger asChild>
-        <div className="group sticky top-0 z-10 flex cursor-pointer items-center justify-between gap-3 bg-card px-5 py-4 text-left select-none hover:bg-secondary/30">
-          <span className="text-[13.5px] font-semibold">{title}</span>
+        <div className="group sticky top-0 z-10 flex cursor-pointer items-center gap-3 bg-card px-5 py-3.5 text-left select-none hover:bg-secondary/30">
+          <span className="shrink-0 text-[13px] font-semibold">{title}</span>
+          <span className="min-w-0 flex-1 truncate text-right text-[11.5px] text-muted-foreground">
+            {!open && summary}
+          </span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
         </div>
       </CollapsibleTrigger>
@@ -396,7 +404,26 @@ function StampAppearanceCard({
   disabled,
 }: StampAppearanceCardProps) {
   return (
-    <SettingsSection title="Stamp appearance" contentClassName="gap-4">
+    <SettingsSection
+      title="Stamp appearance"
+      defaultOpen={false}
+      summary={(() => {
+        const shown = [
+          showSignerName && 'Name',
+          showSignedLabel && 'Signed label',
+          showDate && 'Date',
+          showTime && 'Time',
+          showReason && 'Reason',
+          showLocation && 'Location',
+          showDN && 'DN',
+          showCertSerial && 'Serial',
+        ].filter(Boolean) as string[]
+        if (shown.length === 0) return 'Nothing shown'
+        // Two names plus a count reads better in a narrow header than a truncated list.
+        return shown.length <= 2 ? shown.join(' · ') : `${shown[0]} · ${shown[1]} +${shown.length - 2}`
+      })()}
+      contentClassName="gap-4"
+    >
         <div className="flex flex-col gap-3">
           <span className="text-[12px] font-semibold text-muted-foreground">Show on stamp</span>
 
@@ -2613,7 +2640,7 @@ export function SignDocumentPage() {
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5">
           <Card className={flushCardClass}>
-            <SettingsSection title="Signing certificate">
+            <SettingsSection title="Signing certificate" summary={selectedCert?.holderName}>
                 {certificates.filter((c) => c.status !== 'expired').map((cert) => (
                   <button
                     key={cert.id}
@@ -2636,7 +2663,113 @@ export function SignDocumentPage() {
                 ))}
             </SettingsSection>
 
-            <SettingsSection title="Password protection" contentClassName="gap-2">
+            <SettingsSection
+              title="Pages to sign"
+              summary={BATCH_PAGE_MODE_LABEL[batchPageMode]}
+              contentClassName="gap-2"
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={phase !== 'setup'}
+                    className="h-9 w-full justify-between rounded-[9px] px-3 text-[12.5px] font-normal"
+                  >
+                    {BATCH_PAGE_MODE_LABEL[batchPageMode]}
+                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuRadioGroup
+                    value={batchPageMode}
+                    onValueChange={(v) => setBatchPageMode(v as typeof batchPageMode)}
+                  >
+                    {(Object.entries(BATCH_PAGE_MODE_LABEL) as [StandardPageMode, string][]).map(([value, label]) => (
+                      <DropdownMenuRadioItem key={value} value={value}>
+                        {label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {batchPageMode === 'custom' && (
+                <div className="flex flex-col gap-2">
+                  <Input
+                    value={batchPageRange}
+                    onChange={(e) => setBatchPageRange(e.target.value.replace(/[^0-9,\-\s]/g, ''))}
+                    placeholder="e.g. 1-3, 6, 6-12"
+                    disabled={phase !== 'setup'}
+                    className={cn(
+                      'h-9 rounded-[9px]',
+                      (submitAttempted || batchPageRange.trim()) && !batchPageRangeValid && 'border-destructive',
+                    )}
+                  />
+                  {batchPageRange.trim() && !batchPageRangeValid && (
+                    <span className="text-[11px] font-medium text-destructive">
+                      Use page numbers only, comma-separated (e.g. 1-3, 6, 6-12).
+                    </span>
+                  )}
+                  {batchPageRange.trim() && batchPageRangeValid && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Matched by page number in each file — a file that's too short to reach every page in the list
+                      is signed on all its pages instead.
+                      {previewFile && previewFile.pages > 0 && (
+                        <>
+                          {' '}
+                          E.g.{' '}
+                          <span className="font-semibold text-foreground">
+                            {batchPreviewResolved
+                              ? formatPageSelection(batchPreviewResolved, previewFile.pages)
+                              : `All ${previewFile.pages} pages`}
+                          </span>{' '}
+                          in "{truncateMiddle(previewFile.name, 22)}".
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+              )}
+            </SettingsSection>
+
+            <StampAppearanceCard
+              showSignerName={showSignerName}
+              onShowSignerNameChange={setShowSignerName}
+              showSignedLabel={showSignedLabel}
+              onShowSignedLabelChange={setShowSignedLabel}
+              showDate={showDate}
+              onShowDateChange={setShowDate}
+              showTime={showTime}
+              onShowTimeChange={setShowTime}
+              showReason={showReason}
+              onShowReasonChange={setShowReason}
+              reasonText={reasonText}
+              onReasonTextChange={setReasonText}
+              showLocation={showLocation}
+              onShowLocationChange={setShowLocation}
+              locationText={locationText}
+              onLocationTextChange={setLocationText}
+              showDN={showDN}
+              onShowDNChange={setShowDN}
+              showCertSerial={showCertSerial}
+              onShowCertSerialChange={setShowCertSerial}
+              disabled={phase !== 'setup'}
+            />
+
+            <SettingsSection
+              title="Password protection"
+              defaultOpen={false}
+              summary={
+                passwordMode === 'none'
+                  ? 'Not protected'
+                  : passwordMode === 'common'
+                    ? 'Same for all files'
+                    : passwordMode === 'custom'
+                      ? 'One per file'
+                      : 'From uploaded list'
+              }
+              contentClassName="gap-2"
+            >
                 <RadioGroup value={passwordMode} onValueChange={(v) => setPasswordMode(v as PasswordMode)} className="gap-2">
                   <OptionCard
                     value="none"
@@ -2713,96 +2846,16 @@ export function SignDocumentPage() {
               </SettingsSection>
             )}
 
-            <StampAppearanceCard
-              showSignerName={showSignerName}
-              onShowSignerNameChange={setShowSignerName}
-              showSignedLabel={showSignedLabel}
-              onShowSignedLabelChange={setShowSignedLabel}
-              showDate={showDate}
-              onShowDateChange={setShowDate}
-              showTime={showTime}
-              onShowTimeChange={setShowTime}
-              showReason={showReason}
-              onShowReasonChange={setShowReason}
-              reasonText={reasonText}
-              onReasonTextChange={setReasonText}
-              showLocation={showLocation}
-              onShowLocationChange={setShowLocation}
-              locationText={locationText}
-              onLocationTextChange={setLocationText}
-              showDN={showDN}
-              onShowDNChange={setShowDN}
-              showCertSerial={showCertSerial}
-              onShowCertSerialChange={setShowCertSerial}
-              disabled={phase !== 'setup'}
-            />
-
-            <SettingsSection title="Pages to sign" contentClassName="gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={phase !== 'setup'}
-                    className="h-9 w-full justify-between rounded-[9px] px-3 text-[12.5px] font-normal"
-                  >
-                    {BATCH_PAGE_MODE_LABEL[batchPageMode]}
-                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuRadioGroup
-                    value={batchPageMode}
-                    onValueChange={(v) => setBatchPageMode(v as typeof batchPageMode)}
-                  >
-                    {(Object.entries(BATCH_PAGE_MODE_LABEL) as [StandardPageMode, string][]).map(([value, label]) => (
-                      <DropdownMenuRadioItem key={value} value={value}>
-                        {label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {batchPageMode === 'custom' && (
-                <div className="flex flex-col gap-2">
-                  <Input
-                    value={batchPageRange}
-                    onChange={(e) => setBatchPageRange(e.target.value.replace(/[^0-9,\-\s]/g, ''))}
-                    placeholder="e.g. 1-3, 6, 6-12"
-                    disabled={phase !== 'setup'}
-                    className={cn(
-                      'h-9 rounded-[9px]',
-                      (submitAttempted || batchPageRange.trim()) && !batchPageRangeValid && 'border-destructive',
-                    )}
-                  />
-                  {batchPageRange.trim() && !batchPageRangeValid && (
-                    <span className="text-[11px] font-medium text-destructive">
-                      Use page numbers only, comma-separated (e.g. 1-3, 6, 6-12).
-                    </span>
-                  )}
-                  {batchPageRange.trim() && batchPageRangeValid && (
-                    <span className="text-[11px] text-muted-foreground">
-                      Matched by page number in each file — a file that's too short to reach every page in the list
-                      is signed on all its pages instead.
-                      {previewFile && previewFile.pages > 0 && (
-                        <>
-                          {' '}
-                          E.g.{' '}
-                          <span className="font-semibold text-foreground">
-                            {batchPreviewResolved
-                              ? formatPageSelection(batchPreviewResolved, previewFile.pages)
-                              : `All ${previewFile.pages} pages`}
-                          </span>{' '}
-                          in "{truncateMiddle(previewFile.name, 22)}".
-                        </>
-                      )}
-                    </span>
-                  )}
-                </div>
-              )}
-            </SettingsSection>
-
-            <SettingsSection title="Output" contentClassName="gap-3">
+            <SettingsSection
+              title="Output file"
+              defaultOpen={false}
+              summary={
+                batchPrefix.trim() || batchSuffix.trim()
+                  ? `${batchPrefix}name${batchSuffix}.pdf`
+                  : 'Original file names'
+              }
+              contentClassName="gap-3"
+            >
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="folder-name" className="text-[12px] font-semibold text-muted-foreground">
                     Batch / folder name
@@ -3362,7 +3415,7 @@ export function SignDocumentPage() {
         {/* Controls */}
         <div className="flex min-h-0 flex-1 flex-col gap-5">
         <Card className={flushCardClass}>
-          <SettingsSection title="Signing certificate">
+          <SettingsSection title="Signing certificate" summary={selectedCert?.holderName}>
               {certificates.filter((c) => c.status !== 'expired').map((cert) => (
                 <button
                   key={cert.id}
@@ -3387,30 +3440,7 @@ export function SignDocumentPage() {
               ))}
           </SettingsSection>
 
-          <StampAppearanceCard
-            showSignerName={showSignerName}
-            onShowSignerNameChange={setShowSignerName}
-            showSignedLabel={showSignedLabel}
-            onShowSignedLabelChange={setShowSignedLabel}
-            showDate={showDate}
-            onShowDateChange={setShowDate}
-            showTime={showTime}
-            onShowTimeChange={setShowTime}
-            showReason={showReason}
-            onShowReasonChange={setShowReason}
-            reasonText={reasonText}
-            onReasonTextChange={setReasonText}
-            showLocation={showLocation}
-            onShowLocationChange={setShowLocation}
-            locationText={locationText}
-            onLocationTextChange={setLocationText}
-            showDN={showDN}
-            onShowDNChange={setShowDN}
-            showCertSerial={showCertSerial}
-            onShowCertSerialChange={setShowCertSerial}
-          />
-
-          <SettingsSection title="Pages to sign" contentClassName="gap-2">
+          <SettingsSection title="Pages to sign" summary={pageModeLabel} contentClassName="gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -3458,7 +3488,72 @@ export function SignDocumentPage() {
               )}
           </SettingsSection>
 
-          <SettingsSection title="Output file" contentClassName="gap-3">
+          <StampAppearanceCard
+            showSignerName={showSignerName}
+            onShowSignerNameChange={setShowSignerName}
+            showSignedLabel={showSignedLabel}
+            onShowSignedLabelChange={setShowSignedLabel}
+            showDate={showDate}
+            onShowDateChange={setShowDate}
+            showTime={showTime}
+            onShowTimeChange={setShowTime}
+            showReason={showReason}
+            onShowReasonChange={setShowReason}
+            reasonText={reasonText}
+            onReasonTextChange={setReasonText}
+            showLocation={showLocation}
+            onShowLocationChange={setShowLocation}
+            locationText={locationText}
+            onLocationTextChange={setLocationText}
+            showDN={showDN}
+            onShowDNChange={setShowDN}
+            showCertSerial={showCertSerial}
+            onShowCertSerialChange={setShowCertSerial}
+          />
+
+          <SettingsSection
+            title="Password protection"
+            defaultOpen={false}
+            summary={singleProtect ? 'Password set' : 'Not protected'}
+            contentClassName="gap-3"
+          >
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="protect" className="flex flex-col items-start gap-0.5">
+                  <span className="text-[12.5px] font-semibold">Password protect</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">Recipient needs a password to open</span>
+                </Label>
+                <Switch id="protect" checked={singleProtect} onCheckedChange={setSingleProtect} />
+              </div>
+              {singleProtect && (
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={singlePassword}
+                    onChange={(e) => setSinglePassword(e.target.value)}
+                    placeholder="Set a password"
+                    className="h-10 rounded-[9px] pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              )}
+          </SettingsSection>
+
+          <SettingsSection
+            title="Output file"
+            defaultOpen={false}
+            summary={
+              singlePrefix.trim() || singleSuffix.trim()
+                ? `${singlePrefix}name${singleSuffix}.pdf`
+                : 'Original file name'
+            }
+            contentClassName="gap-3"
+          >
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="single-prefix" className="text-[12px] font-semibold text-muted-foreground">
@@ -3488,34 +3583,6 @@ export function SignDocumentPage() {
               <span className="truncate font-mono text-[11px] text-muted-foreground">
                 {buildOutputName(singlePrefix, stripPdfExt(file.name), singleSuffix)}
               </span>
-          </SettingsSection>
-
-          <SettingsSection title="Password protect" contentClassName="gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="protect" className="flex flex-col items-start gap-0.5">
-                  <span className="text-[12.5px] font-semibold">Password protect</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">Recipient needs a password to open</span>
-                </Label>
-                <Switch id="protect" checked={singleProtect} onCheckedChange={setSingleProtect} />
-              </div>
-              {singleProtect && (
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={singlePassword}
-                    onChange={(e) => setSinglePassword(e.target.value)}
-                    placeholder="Set a password"
-                    className="h-10 rounded-[9px] pr-9"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-              )}
           </SettingsSection>
 
         </Card>
