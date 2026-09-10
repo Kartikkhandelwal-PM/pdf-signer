@@ -1,4 +1,6 @@
-const NOW = new Date('2026-09-05T10:00:00')
+// The demo data is dated around this point, so "now" is pinned here rather than read from the
+// clock — otherwise every relative time and date filter drifts as real time passes.
+export const NOW = new Date('2026-09-05T10:00:00')
 
 export function formatRelativeTime(iso: string): string {
   const diffMs = NOW.getTime() - new Date(iso).getTime()

@@ -62,7 +62,10 @@ export function RecentDocumentsList() {
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[12.5px] font-semibold">{doc.name}</span>
-                <span className="truncate text-[11px] text-muted-foreground">{doc.client}</span>
+                <span className="truncate font-mono text-[11px] text-muted-foreground">
+                  {doc.pages} {doc.pages === 1 ? 'page' : 'pages'}
+                  {doc.sentTo ? ` · ${doc.sentTo}` : ''}
+                </span>
               </div>
               <DocumentStatusBadge status={doc.status} />
               <span className="w-16 shrink-0 text-right font-mono text-[11px] whitespace-nowrap text-muted-foreground">

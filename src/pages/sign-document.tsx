@@ -1202,7 +1202,6 @@ export function SignDocumentPage() {
           batchPrefix.trim() || batchSuffix.trim()
             ? buildOutputName(batchPrefix, stripPdfExt(f.name), batchSuffix)
             : f.name,
-        client: 'Batch upload',
         status: 'signed',
         pages: f.pages,
         signedPages,
@@ -1663,7 +1662,6 @@ export function SignDocumentPage() {
     const newDocument: SignedDocument = {
       id: `doc-${Date.now()}`,
       name: buildOutputName(singlePrefix, stripPdfExt(file.name), singleSuffix) || file.name,
-      client: 'Internal document',
       status: 'signed',
       pages: file.pages,
       signedPages,
@@ -1692,7 +1690,6 @@ export function SignDocumentPage() {
     const draftDocument: SignedDocument = {
       id: resumeDoc?.id ?? `doc-${Date.now()}`,
       name: buildOutputName(singlePrefix, stripPdfExt(file.name), singleSuffix) || file.name,
-      client: 'Internal document',
       status: 'draft',
       pages: file.pages,
       signedBy: '—',

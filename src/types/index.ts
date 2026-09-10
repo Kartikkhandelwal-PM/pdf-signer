@@ -2,6 +2,10 @@ export type DocumentStatus = 'signed' | 'draft' | 'expired'
 
 export type DocumentSource = 'single' | 'batch'
 
+// What happened to a document after it left the outbox. Tracked per document because a batch
+// send can succeed for one client and bounce for another.
+export type DeliveryStatus = 'sent' | 'delivered' | 'opened' | 'downloaded' | 'failed'
+
 // The outcome of running a document through Verify signature — not just "valid" vs "tampered".
 // A signature can be cryptographically intact yet still untrustworthy (expired or revoked
 // certificate), or simply absent (unsigned).
@@ -10,7 +14,6 @@ export type VerifyStatus = 'valid' | 'invalid' | 'unsigned' | 'expired' | 'revok
 export interface SignedDocument {
   id: string
   name: string
-  client: string
   status: DocumentStatus
   pages: number
   signedPages?: string
@@ -21,6 +24,7 @@ export interface SignedDocument {
   password?: string
   sentTo?: string
   recipientName?: string
+  deliveryStatus?: DeliveryStatus
   source?: DocumentSource
   batchName?: string
   lastVerifiedStatus?: VerifyStatus

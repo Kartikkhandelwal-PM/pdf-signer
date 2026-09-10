@@ -297,7 +297,8 @@ export function AllDocumentsPage() {
       const matchesQuery =
         query.trim().length === 0 ||
         doc.name.toLowerCase().includes(query.toLowerCase()) ||
-        doc.client.toLowerCase().includes(query.toLowerCase())
+        (doc.sentTo?.toLowerCase().includes(query.toLowerCase()) ?? false) ||
+        (doc.recipientName?.toLowerCase().includes(query.toLowerCase()) ?? false)
       return matchesStatus && matchesSource && matchesQuery
     })
   }, [documents, query, status, source])
@@ -377,7 +378,7 @@ export function AllDocumentsPage() {
             <Input
               value={query}
               onChange={(e) => updateQuery(e.target.value)}
-              placeholder="Search by document or client…"
+              placeholder="Search by document or recipient…"
               className="h-10 rounded-[10px] bg-secondary/60 pl-10"
             />
           </div>
