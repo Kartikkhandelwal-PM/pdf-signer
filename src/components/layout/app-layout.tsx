@@ -17,7 +17,11 @@ export function AppLayout() {
         <AppSidebar />
         <SidebarInset className="min-h-0">
           <AppTopbar />
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* isolate keeps the page's own stacking inside this box. Without it, elements the
+              browser promotes to their own compositor layer — the home banner's animated sun
+              glow, for one — can paint over the topbar and anything hanging off it, like the
+              global search results. */}
+          <div className="isolate flex min-h-0 flex-1 flex-col overflow-y-auto">
             <Outlet />
           </div>
         </SidebarInset>
