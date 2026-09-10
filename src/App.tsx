@@ -7,14 +7,18 @@ import { DocumentsProvider } from '@/context/documents-context'
 import { AllDocumentsPage } from '@/pages/all-documents'
 import { CertificatesPage } from '@/pages/certificates'
 import { ComingSoonPage } from '@/pages/coming-soon'
-import { DashboardPage } from '@/pages/dashboard'
+// Classic stats-and-tables dashboard — no longer routed; see the matching commented-out
+// nav entry in config/nav.ts. Kept importable rather than deleted in case we bring it back.
+// import { DashboardPage } from '@/pages/dashboard'
+import { HomePage } from '@/pages/home'
 import { SentDocumentsPage } from '@/pages/sent-documents'
 import { SettingsPage } from '@/pages/settings'
 import { SignDocumentPage } from '@/pages/sign-document'
 import { VerifySignaturePage } from '@/pages/verify-signature'
 
 const pageRegistry: Partial<Record<string, ComponentType>> = {
-  '/': DashboardPage,
+  '/home': HomePage,
+  // '/': DashboardPage,
   '/documents': AllDocumentsPage,
   '/sign': SignDocumentPage,
   '/certificates': CertificatesPage,
@@ -48,6 +52,7 @@ function App() {
               />
             )
           })}
+          <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/batch" element={<Navigate to="/sign" replace />} />
           <Route path="/signed" element={<Navigate to="/documents" replace />} />
         </Route>

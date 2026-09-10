@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Download,
   Eye,
@@ -10,6 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { SendDialog } from '@/components/documents/send-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -36,14 +38,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDocuments } from '@/context/documents-context'
 import { formatRelativeTime } from '@/lib/format'
+import type { SignedDocument } from '@/types'
 import { DocumentStatusBadge } from './status-badge'
 
 export function DocumentsTable() {
   const navigate = useNavigate()
   const { documents } = useDocuments()
   const recentDocuments = documents.slice(0, 6)
+  const [sendDoc, setSendDoc] = useState<SignedDocument | null>(null)
 
   return (
+    <>
     <Card className="gap-0 overflow-hidden rounded-2xl border border-border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0">
       <CardHeader className="gap-1.5 border-b border-border py-5.5">
         <CardTitle className="text-[15.5px] font-semibold">Recent documents</CardTitle>
@@ -172,13 +177,9 @@ export function DocumentsTable() {
                             <Download />
                             Download
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              toast(`Preparing to send ${doc.name} to client`)
-                            }
-                          >
+                          <DropdownMenuItem onClick={() => setSendDoc(doc)}>
                             <Send />
-                            Send to client
+                            {doc.sentTo ? 'Resend' : 'Send to client'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -191,5 +192,10 @@ export function DocumentsTable() {
         </div>
       </CardContent>
     </Card>
+
+    {sendDoc && (
+      <SendDialog documents={[sendDoc]} open={sendDoc !== null} onOpenChange={(open) => !open && setSendDoc(null)} />
+    )}
+    </>
   )
 }

@@ -46,7 +46,10 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { RecipientTemplateCard } from '@/components/documents/recipient-template-card'
+import { SendDialog } from '@/components/documents/send-dialog'
 import { FileDropzone } from '@/components/shared/file-dropzone'
+import { OptionCard } from '@/components/shared/option-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -61,7 +64,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { RadioGroup } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { useDocuments } from '@/context/documents-context'
 import { certificates } from '@/data/mock'
@@ -71,9 +74,6 @@ import type { SignedDocument } from '@/types'
 
 type Position = 'top-left' | 'top-right' | 'center' | 'bottom-left' | 'bottom-right' | 'custom'
 type PasswordMode = 'none' | 'common' | 'custom' | 'uploaded-list'
-// 'per-file' reuses the SAME uploaded CSV as PasswordMode's 'uploaded-list' — one template
-// carries both a Password and an Email column, matched by filename.
-type SendMode = 'none' | 'common' | 'per-file'
 type BatchPhase = 'setup' | 'processing' | 'done'
 
 // Whether an uploaded file needs its EXISTING open-password before we can read it at all —
@@ -88,7 +88,6 @@ interface WorkFile {
   file: File
   pages: number
   password: string
-  email: string
   progress: number
   protection: ProtectionState
   unlockPassword?: string
@@ -1015,6 +1014,11 @@ export function SignDocumentPage() {
   const [certId, setCertId] = useState(certificates.find((c) => c.isDefault)?.id ?? certificates[0]?.id)
   const selectedCert = useMemo(() => certificates.find((c) => c.id === certId) ?? certificates[0], [certId])
 
+  // Sending is a separate step from signing — after a document (or batch) is signed, its
+  // freshly-created row(s) are handed to the same Send dialog used everywhere else in the app.
+  const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
+  const [batchResultDocs, setBatchResultDocs] = useState<SignedDocument[]>([])
+
   // Single-document-only state
   const [unlockInput, setUnlockInput] = useState('')
   const [showUnlockPassword, setShowUnlockPassword] = useState(false)
@@ -1035,8 +1039,6 @@ export function SignDocumentPage() {
   const [singleProtect, setSingleProtect] = useState(false)
   const [singlePassword, setSinglePassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [sendToClient, setSendToClient] = useState(true)
-  const [email, setEmail] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -1058,8 +1060,6 @@ export function SignDocumentPage() {
   const [lockedQuery, setLockedQuery] = useState('')
   const [lockedPage, setLockedPage] = useState(0)
   const [passwordMode, setPasswordMode] = useState<PasswordMode>('none')
-  const [sendMode, setSendMode] = useState<SendMode>('none')
-  const [commonEmail, setCommonEmail] = useState('')
   const [commonPassword, setCommonPassword] = useState('')
   const [phase, setPhase] = useState<BatchPhase>('setup')
   const [submitAttempted, setSubmitAttempted] = useState(false)
@@ -1142,10 +1142,6 @@ export function SignDocumentPage() {
   useEffect(() => {
     if (!resumeDoc || resumeLoadedRef.current) return
     resumeLoadedRef.current = true
-    if (resumeDoc.sentTo) {
-      setSendToClient(true)
-      setEmail(resumeDoc.sentTo)
-    }
     const cachedFile = getDraftFile(resumeDoc.id)
     if (cachedFile) addFiles([cachedFile])
     // Only the navigation that started this visit should seed these fields — not every render.
@@ -1198,15 +1194,13 @@ export function SignDocumentPage() {
         ? formatPageSelection(resolvedPages, f.pages)
         : `All ${f.pages} page${f.pages === 1 ? '' : 's'}`
 
-      const recipient = sendMode === 'common' ? commonEmail.trim() : sendMode === 'per-file' ? f.email.trim() : ''
-
       return {
         id: `doc-${Date.now()}-${f.id}`,
         name:
           batchPrefix.trim() || batchSuffix.trim()
             ? buildOutputName(batchPrefix, stripPdfExt(f.name), batchSuffix)
             : f.name,
-        client: recipient || 'Batch upload',
+        client: 'Batch upload',
         status: 'signed',
         pages: f.pages,
         signedPages,
@@ -1220,21 +1214,16 @@ export function SignDocumentPage() {
             : passwordMode === 'custom' || passwordMode === 'uploaded-list'
               ? f.password.trim()
               : undefined,
-        sentTo: recipient || undefined,
         source: 'batch',
         batchName,
       }
     })
     addDocuments(newDocuments)
+    setBatchResultDocs(newDocuments)
     setPhase('done')
-    const emailedCount = newDocuments.filter((d) => d.sentTo).length
-    toast.success(
-      `Batch complete — ${files.length} files signed` + (emailedCount > 0 ? ` · ${emailedCount} emailed` : ''),
-    )
+    toast.success(`Batch complete — ${files.length} files signed`)
   }, [
     files,
-    sendMode,
-    commonEmail,
     phase,
     isBatch,
     certId,
@@ -1285,7 +1274,6 @@ export function SignDocumentPage() {
       file: f,
       pages: 0,
       password: '',
-      email: '',
       progress: 0,
       protection: 'checking',
     }))
@@ -1337,29 +1325,65 @@ export function SignDocumentPage() {
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, password } : f)))
   }
 
-  function csvCell(value: string) {
-    return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-  }
-
-  // One combined template — used by PasswordMode's 'uploaded-list' for the Password column,
-  // and by SendMode's 'per-file' for the Email column. A user only fills in whichever column
-  // the mode(s) they picked actually need.
+  // The password-to-protect-with template — just Filename + Password. Recipient info no longer
+  // belongs here: sending is a separate step, handled after signing by the Send dialog.
   function downloadPasswordTemplate() {
-    const rows = [['Filename', 'Password', 'Email'], ...files.map((f) => [f.name, '', ''])]
+    const rows = [['File Name', 'Password'], ...files.map((f) => [f.name, ''])]
     const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'password-email-template.csv'
+    a.download = 'password-template.csv'
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
   }
 
+  function handlePasswordListFile(csvFile: File) {
+    const reader = new FileReader()
+    reader.onerror = () => toast.error('Could not read that file.')
+    reader.onload = () => {
+      const rows = parseUnlockCsvText(String(reader.result ?? ''))
+      if (rows.length === 0) {
+        toast.error('That CSV has no rows — it needs a File Name column and a Password column.')
+        return
+      }
+
+      const byName = new Map(rows.map((r) => [r.filename.toLowerCase(), r]))
+      const matched = files.filter((f) => byName.has(f.name.toLowerCase()))
+      const unmatched = files.filter((f) => !byName.has(f.name.toLowerCase()))
+
+      setFiles((prev) =>
+        prev.map((f) => {
+          const row = byName.get(f.name.toLowerCase())
+          if (!row) return f
+          return { ...f, password: row.password || f.password }
+        }),
+      )
+      setCsvFileName(csvFile.name)
+      setCsvMatchedCount(matched.length)
+      setCsvUnmatched(unmatched.map((f) => f.name))
+
+      if (matched.length === 0) {
+        toast.error('No filenames in that CSV matched your uploaded files.')
+      } else if (unmatched.length > 0) {
+        toast.warning(`Matched ${matched.length} of ${files.length} files — ${unmatched.length} still need a row.`)
+      } else {
+        toast.success(`Loaded ${matched.length} rows from ${csvFile.name}`)
+      }
+    }
+    reader.readAsText(csvFile)
+  }
+
+  function csvCell(value: string) {
+    return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+  }
+
   // Splits one CSV line into cells, honoring double-quoted values that may contain commas
-  // or escaped ("") quotes — simple RFC-4180-ish parsing, enough for a template we authored ourselves.
+  // or escaped ("") quotes — used only by the unlock-CSV parser below, which is a distinct
+  // 2-column format (Filename, Password) unrelated to the recipient template.
   function parseCsvLine(line: string): string[] {
     const cells: string[] = []
     let current = ''
@@ -1388,59 +1412,19 @@ export function SignDocumentPage() {
     return cells
   }
 
-  function parseCsvText(text: string): { filename: string; password: string; email: string }[] {
+  function parseUnlockCsvText(text: string): { filename: string; password: string }[] {
     const lines = text.split(/\r\n|\n|\r/).filter((line) => line.trim().length > 0)
     const rows = lines.map(parseCsvLine)
-    const looksLikeHeader = rows[0]?.some((cell) => /filename|file name|password|email/i.test(cell))
+    const looksLikeHeader = rows[0]?.some((cell) => /filename|file name|password/i.test(cell))
     const dataRows = looksLikeHeader ? rows.slice(1) : rows
     return dataRows
       .filter((cols) => cols[0]?.trim())
-      .map((cols) => ({
-        filename: cols[0].trim(),
-        password: (cols[1] ?? '').trim(),
-        email: (cols[2] ?? '').trim(),
-      }))
+      .map((cols) => ({ filename: cols[0].trim(), password: (cols[1] ?? '').trim() }))
   }
 
-  function handlePasswordListFile(csvFile: File) {
-    const reader = new FileReader()
-    reader.onerror = () => toast.error('Could not read that file.')
-    reader.onload = () => {
-      const rows = parseCsvText(String(reader.result ?? ''))
-      if (rows.length === 0) {
-        toast.error('That CSV has no rows — it needs at least a Filename column.')
-        return
-      }
-
-      const byName = new Map(rows.map((r) => [r.filename.toLowerCase(), r]))
-      const matched = files.filter((f) => byName.has(f.name.toLowerCase()))
-      const unmatched = files.filter((f) => !byName.has(f.name.toLowerCase()))
-
-      setFiles((prev) =>
-        prev.map((f) => {
-          const row = byName.get(f.name.toLowerCase())
-          if (!row) return f
-          return { ...f, password: row.password || f.password, email: row.email || f.email }
-        }),
-      )
-      setCsvFileName(csvFile.name)
-      setCsvMatchedCount(matched.length)
-      setCsvUnmatched(unmatched.map((f) => f.name))
-
-      if (matched.length === 0) {
-        toast.error('No filenames in that CSV matched your uploaded files.')
-      } else if (unmatched.length > 0) {
-        toast.warning(`Matched ${matched.length} of ${files.length} files — ${unmatched.length} still need a row.`)
-      } else {
-        toast.success(`Loaded ${matched.length} rows from ${csvFile.name}`)
-      }
-    }
-    reader.readAsText(csvFile)
-  }
-
-  // Same shape as the output-password template above, but for the EXISTING open-password on
-  // whichever uploaded files turned out to be locked — a separate template because it answers
-  // a different question ("what already opens this file" vs. "what should protect it once sent").
+  // Same shape as the recipient template above, but for the EXISTING open-password on whichever
+  // uploaded files turned out to be locked — a separate template because it answers a different
+  // question ("what already opens this file" vs. "what should protect it once sent").
   function downloadUnlockTemplate() {
     const locked = files.filter((f) => f.protection === 'locked')
     const rows = [['Filename', 'Password'], ...locked.map((f) => [f.name, ''])]
@@ -1460,7 +1444,7 @@ export function SignDocumentPage() {
     const reader = new FileReader()
     reader.onerror = () => toast.error('Could not read that file.')
     reader.onload = () => {
-      const rows = parseCsvText(String(reader.result ?? ''))
+      const rows = parseUnlockCsvText(String(reader.result ?? ''))
       if (rows.length === 0) {
         toast.error('That CSV has no rows — it needs a Filename column and a Password column.')
         return
@@ -1486,8 +1470,6 @@ export function SignDocumentPage() {
     setFiles([])
     setPhase('setup')
     setCommonPassword('')
-    setSendMode('none')
-    setCommonEmail('')
     setSubmitAttempted(false)
     setCsvFileName(null)
     setCsvMatchedCount(0)
@@ -1506,6 +1488,7 @@ export function SignDocumentPage() {
     setSignStep(0)
     setSignedResult(null)
     setDocHash('')
+    setBatchResultDocs([])
     pendingDocRef.current = null
     setUnlockInput('')
     setShowUnlockPassword(false)
@@ -1652,10 +1635,6 @@ export function SignDocumentPage() {
       toast.error('Set a password with at least 4 characters, or turn protection off.')
       return
     }
-    if (sendToClient && email.trim().length === 0) {
-      toast.error('Enter a client email address, or turn off sending.')
-      return
-    }
     if (pageMode === 'custom' && !parsedCustomPages) {
       toast.error(`Enter a valid page range between 1 and ${file.pages}.`)
       return
@@ -1669,7 +1648,7 @@ export function SignDocumentPage() {
     const newDocument: SignedDocument = {
       id: `doc-${Date.now()}`,
       name: buildOutputName(singlePrefix, stripPdfExt(file.name), singleSuffix) || file.name,
-      client: sendToClient && email.trim() ? email.trim() : 'Internal document',
+      client: 'Internal document',
       status: 'signed',
       pages: file.pages,
       signedPages,
@@ -1678,7 +1657,6 @@ export function SignDocumentPage() {
       updatedAt: new Date().toISOString(),
       passwordProtected: singleProtect,
       password: singleProtect ? singlePassword.trim() : undefined,
-      sentTo: sendToClient ? email.trim() : undefined,
       source: 'single',
     }
 
@@ -1699,7 +1677,7 @@ export function SignDocumentPage() {
     const draftDocument: SignedDocument = {
       id: resumeDoc?.id ?? `doc-${Date.now()}`,
       name: buildOutputName(singlePrefix, stripPdfExt(file.name), singleSuffix) || file.name,
-      client: sendToClient && email.trim() ? email.trim() : 'Internal document',
+      client: 'Internal document',
       status: 'draft',
       pages: file.pages,
       signedBy: '—',
@@ -1738,10 +1716,6 @@ export function SignDocumentPage() {
     }
     if (batchPageMode === 'custom' && !isPageExpressionSyntaxValid(batchPageRange)) {
       toast.error('Enter a valid page selection, e.g. "1-3, 6, 6-12" or "first, last".')
-      return
-    }
-    if (sendMode === 'common' && !/^\S+@\S+\.\S+$/.test(commonEmail.trim())) {
-      toast.error('Enter a valid client email address, or turn off sending.')
       return
     }
 
@@ -2010,14 +1984,6 @@ export function SignDocumentPage() {
     }
 
     if (phase === 'done') {
-      const emailedCount =
-        sendMode === 'common'
-          ? commonEmail.trim()
-            ? files.length
-            : 0
-          : sendMode === 'per-file'
-            ? files.filter((f) => f.email.trim()).length
-            : 0
       const protectedCount = passwordMode === 'none' ? 0 : files.length
       const burstDots = [
         { x: -46, y: -58, color: 'var(--primary)', delay: 0 },
@@ -2102,7 +2068,7 @@ export function SignDocumentPage() {
                 </div>
               </div>
 
-              <div className="grid w-full animate-in grid-cols-3 gap-3 fade-in-0 slide-in-from-bottom-2 delay-150 duration-500">
+              <div className="grid w-full animate-in grid-cols-2 gap-3 fade-in-0 slide-in-from-bottom-2 delay-150 duration-500">
                 <div className="flex flex-col items-center gap-1 rounded-[10px] border border-border p-4">
                   <span className="text-[20px] font-bold text-primary">{files.length}</span>
                   <span className="text-[11px] text-muted-foreground">Signed</span>
@@ -2111,28 +2077,21 @@ export function SignDocumentPage() {
                   <span className="text-[20px] font-bold text-success">{protectedCount}</span>
                   <span className="text-[11px] text-muted-foreground">Password protected</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 rounded-[10px] border border-border p-4">
-                  <span className="text-[20px] font-bold text-brand-teal">{emailedCount}</span>
-                  <span className="text-[11px] text-muted-foreground">Emailed</span>
-                </div>
               </div>
 
               <div className="flex w-full animate-in items-center gap-2.5 rounded-[10px] bg-secondary/50 p-3.5 text-[12px] text-muted-foreground fade-in-0 delay-200 duration-500">
                 <Mail className="size-4 shrink-0 text-primary" />
-                {sendMode === 'none' && 'No files were emailed.'}
-                {sendMode === 'common' &&
-                  (commonEmail.trim()
-                    ? `All ${files.length} files sent to ${commonEmail.trim()}.`
-                    : 'No files were emailed.')}
-                {sendMode === 'per-file' &&
-                  (emailedCount > 0
-                    ? `${emailedCount} of ${files.length} files emailed to their matched client${
-                        emailedCount < files.length ? ` — ${files.length - emailedCount} had no email in the CSV` : ''
-                      }.`
-                    : "No filenames in the CSV had an email — nothing was sent.")}
+                Nothing's been emailed yet — send it to your clients whenever you're ready.
               </div>
 
               <div className="flex w-full animate-in flex-col items-center gap-3 fade-in-0 delay-300 duration-500">
+                <Button
+                  className="h-11 w-full gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                  onClick={() => setSendTargets(batchResultDocs)}
+                >
+                  <Send className="size-4" />
+                  Send to clients
+                </Button>
                 <div className="flex w-full items-center gap-2.5">
                   <Button
                     variant="ghost"
@@ -2143,7 +2102,8 @@ export function SignDocumentPage() {
                     Download all
                   </Button>
                   <Button
-                    className="h-11 flex-1 gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                    variant="ghost"
+                    className="h-11 flex-1 gap-1.5 rounded-[10px] bg-secondary font-semibold hover:bg-secondary/70"
                     onClick={() => navigate('/documents')}
                   >
                     View all documents
@@ -2155,6 +2115,13 @@ export function SignDocumentPage() {
               </div>
             </div>
           </Card>
+          {sendTargets && (
+            <SendDialog
+              documents={sendTargets}
+              open={sendTargets !== null}
+              onOpenChange={(open) => !open && setSendTargets(null)}
+            />
+          )}
         </div>
       )
     }
@@ -2564,7 +2531,7 @@ export function SignDocumentPage() {
             />
           )}
 
-          <div className="flex min-h-0 flex-1 flex-col gap-5">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5">
           <Card className={flushCardClass}>
             <SettingsSection title="Signing certificate">
                 {certificates.filter((c) => c.status !== 'expired').map((cert) => (
@@ -2589,156 +2556,80 @@ export function SignDocumentPage() {
                 ))}
             </SettingsSection>
 
-            <SettingsSection title="Password protection" contentClassName="gap-3">
-                <RadioGroup value={passwordMode} onValueChange={(v) => setPasswordMode(v as PasswordMode)} className="gap-2.5">
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setPasswordMode('none')}
-                  >
-                    <RadioGroupItem value="none" disabled={phase !== 'setup'} />
-                    Don't password protect
-                  </div>
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setPasswordMode('common')}
-                  >
-                    <RadioGroupItem value="common" disabled={phase !== 'setup'} />
-                    <KeyRound className="size-3.5 text-muted-foreground" />
-                    Same password for all files
-                  </div>
-                  {passwordMode === 'common' && (
-                    <div className="ml-6 flex w-[calc(100%-1.5rem)] flex-col gap-1">
-                      <Input
-                        type="password"
-                        value={commonPassword}
-                        onChange={(e) => setCommonPassword(e.target.value)}
-                        placeholder="Set a password"
-                        disabled={phase !== 'setup'}
-                        className={cn(
-                          'h-9 rounded-[9px]',
-                          submitAttempted && commonPassword.trim().length < 4 && 'border-destructive',
-                        )}
-                      />
-                      {submitAttempted && commonPassword.trim().length < 4 && (
-                        <span className="text-[11px] font-medium text-destructive">
-                          Enter at least 4 characters.
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setPasswordMode('custom')}
-                  >
-                    <RadioGroupItem value="custom" disabled={phase !== 'setup'} />
-                    <ListChecks className="size-3.5 text-muted-foreground" />
-                    Custom password per file
-                  </div>
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setPasswordMode('uploaded-list')}
-                  >
-                    <RadioGroupItem value="uploaded-list" disabled={phase !== 'setup'} />
-                    <Upload className="size-3.5 text-muted-foreground" />
-                    Upload a password list (CSV)
-                  </div>
-                </RadioGroup>
-            </SettingsSection>
-
-            <SettingsSection title="Send to client" contentClassName="gap-3">
-                <RadioGroup value={sendMode} onValueChange={(v) => setSendMode(v as SendMode)} className="gap-2.5">
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setSendMode('none')}
-                  >
-                    <RadioGroupItem value="none" disabled={phase !== 'setup'} />
-                    Don't send
-                  </div>
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setSendMode('common')}
-                  >
-                    <RadioGroupItem value="common" disabled={phase !== 'setup'} />
-                    <Send className="size-3.5 text-muted-foreground" />
-                    Same client for all files
-                  </div>
-                  {sendMode === 'common' && (
-                    <div className="ml-6 flex w-[calc(100%-1.5rem)] flex-col gap-1">
-                      <Input
-                        type="email"
-                        value={commonEmail}
-                        onChange={(e) => setCommonEmail(e.target.value)}
-                        placeholder="client@company.com"
-                        disabled={phase !== 'setup'}
-                        className={cn(
-                          'h-9 rounded-[9px]',
-                          submitAttempted && !/^\S+@\S+\.\S+$/.test(commonEmail.trim()) && 'border-destructive',
-                        )}
-                      />
-                      {submitAttempted && !/^\S+@\S+\.\S+$/.test(commonEmail.trim()) && (
-                        <span className="text-[11px] font-medium text-destructive">Enter a valid email address.</span>
-                      )}
-                    </div>
-                  )}
-                  <div
-                    className="flex cursor-pointer items-center gap-2.5 text-[12.5px]"
-                    onClick={() => phase === 'setup' && setSendMode('per-file')}
-                  >
-                    <RadioGroupItem value="per-file" disabled={phase !== 'setup'} />
-                    <ListChecks className="size-3.5 text-muted-foreground" />
-                    Different client per file (CSV)
-                  </div>
-                </RadioGroup>
-            </SettingsSection>
-
-            {(passwordMode === 'uploaded-list' || sendMode === 'per-file') && (
-              <SettingsSection title="Per-file CSV" contentClassName="gap-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    One file, matched by filename —{' '}
-                    {passwordMode === 'uploaded-list' && sendMode === 'per-file'
-                      ? 'fill in the Password and Email columns.'
-                      : passwordMode === 'uploaded-list'
-                        ? 'fill in the Password column.'
-                        : 'fill in the Email column.'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={downloadPasswordTemplate}
+            <SettingsSection title="Password protection" contentClassName="gap-2">
+                <RadioGroup value={passwordMode} onValueChange={(v) => setPasswordMode(v as PasswordMode)} className="gap-2">
+                  <OptionCard
+                    value="none"
+                    selected={passwordMode === 'none'}
+                    onSelect={() => setPasswordMode('none')}
                     disabled={phase !== 'setup'}
-                    className="flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-secondary px-3 text-[11.5px] font-semibold text-foreground hover:bg-secondary/70 disabled:opacity-50"
+                    icon={X}
+                    title="Don't password protect"
+                  />
+                  <OptionCard
+                    value="common"
+                    selected={passwordMode === 'common'}
+                    onSelect={() => setPasswordMode('common')}
+                    disabled={phase !== 'setup'}
+                    icon={KeyRound}
+                    title="Same password for all files"
                   >
-                    <FileDown className="size-3.5" />
-                    Download template · {files.length} file{files.length === 1 ? '' : 's'}
-                  </button>
-                  <label className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] border border-dashed border-border text-[11.5px] text-muted-foreground hover:border-primary/40">
-                    <Upload className="size-3.5" />
-                    {csvFileName ? 'Replace CSV file' : 'Choose CSV file'}
-                    <input
-                      type="file"
-                      accept=".csv"
-                      className="hidden"
+                    <Input
+                      type="password"
+                      value={commonPassword}
+                      onChange={(e) => setCommonPassword(e.target.value)}
+                      placeholder="Set a password"
                       disabled={phase !== 'setup'}
-                      onChange={(e) => {
-                        const selected = e.target.files?.[0]
-                        if (selected) handlePasswordListFile(selected)
-                        e.target.value = ''
-                      }}
+                      className={cn(
+                        'h-9 rounded-[9px]',
+                        submitAttempted && commonPassword.trim().length < 4 && 'border-destructive',
+                      )}
                     />
-                  </label>
-                  {csvFileName && (
-                    <div className="flex flex-col gap-0.5 rounded-[9px] bg-secondary/50 px-3 py-2 text-[11.5px]">
-                      <span className="truncate font-semibold">{csvFileName}</span>
-                      <span className={cn('text-muted-foreground', csvUnmatched.length > 0 && 'font-medium text-warning')}>
-                        {csvMatchedCount} of {files.length} files matched
-                        {csvUnmatched.length > 0 && ` — ${csvUnmatched.length} still need a row below`}
-                      </span>
-                    </div>
-                  )}
-                  {passwordMode === 'uploaded-list' && (
-                    <span className="text-[11px] text-muted-foreground">
-                      Any file the CSV didn't cover still needs a password entered below.
+                    {submitAttempted && commonPassword.trim().length < 4 && (
+                      <span className="text-[11px] font-medium text-destructive">Enter at least 4 characters.</span>
+                    )}
+                  </OptionCard>
+                  <OptionCard
+                    value="custom"
+                    selected={passwordMode === 'custom'}
+                    onSelect={() => setPasswordMode('custom')}
+                    disabled={phase !== 'setup'}
+                    icon={ListChecks}
+                    title="Custom password per file"
+                    description="Set one separately for each file below"
+                  />
+                  <OptionCard
+                    value="uploaded-list"
+                    selected={passwordMode === 'uploaded-list'}
+                    onSelect={() => setPasswordMode('uploaded-list')}
+                    disabled={phase !== 'setup'}
+                    icon={Upload}
+                    title="Upload a password list"
+                    description="One CSV, matched by filename"
+                  />
+                </RadioGroup>
+            </SettingsSection>
+
+            {passwordMode === 'uploaded-list' && (
+              <SettingsSection title="Password list" contentClassName="gap-2">
+                <RecipientTemplateCard
+                  fileNames={files.map((f) => f.name)}
+                  columns={['password']}
+                  helperText="Matched by filename — fill in the Password column."
+                  onDownload={downloadPasswordTemplate}
+                  onUpload={handlePasswordListFile}
+                  uploadedFileName={csvFileName ?? undefined}
+                  disabled={phase !== 'setup'}
+                  status={
+                    <span className={cn('text-muted-foreground', csvUnmatched.length > 0 && 'font-medium text-warning')}>
+                      {csvMatchedCount} of {files.length} files matched
+                      {csvUnmatched.length > 0 && ` — ${csvUnmatched.length} still need a row below`}
                     </span>
-                  )}
+                  }
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  Any file the CSV didn't cover still needs a password entered below.
+                </span>
               </SettingsSection>
             )}
 
@@ -3229,11 +3120,17 @@ export function SignDocumentPage() {
             <div className="flex w-full animate-in items-center gap-2.5 rounded-[10px] bg-secondary/50 p-3.5 text-[12px] text-muted-foreground fade-in-0 delay-200 duration-500">
               <ListChecks className="size-4 shrink-0 text-primary" />
               {signedResult.signedPages} signed
-              {signedResult.sentTo ? ` · sent to ${signedResult.sentTo}` : ''}
               {signedResult.passwordProtected ? ' · password protected' : ''}
             </div>
 
             <div className="flex w-full animate-in flex-col items-center gap-3 fade-in-0 delay-300 duration-500">
+              <Button
+                className="h-11 w-full gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                onClick={() => setSendTargets([signedResult])}
+              >
+                <Send className="size-4" />
+                Send to client
+              </Button>
               <div className="flex w-full items-center gap-2.5">
                 <Button
                   variant="ghost"
@@ -3244,7 +3141,8 @@ export function SignDocumentPage() {
                   Download signed PDF
                 </Button>
                 <Button
-                  className="h-11 flex-1 gap-1.5 rounded-[10px] border-none bg-linear-to-br from-primary to-[#2f93c0] font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:opacity-95"
+                  variant="ghost"
+                  className="h-11 flex-1 gap-1.5 rounded-[10px] bg-secondary font-semibold hover:bg-secondary/70"
                   onClick={() => navigate('/documents')}
                 >
                   View in documents
@@ -3256,6 +3154,13 @@ export function SignDocumentPage() {
             </div>
           </div>
         </Card>
+        {sendTargets && (
+          <SendDialog
+            documents={sendTargets}
+            open={sendTargets !== null}
+            onOpenChange={(open) => !open && setSendTargets(null)}
+          />
+        )}
       </div>
     )
   }
@@ -3492,24 +3397,6 @@ export function SignDocumentPage() {
               )}
           </SettingsSection>
 
-          <SettingsSection title="Send to client" contentClassName="gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="send" className="flex flex-col items-start gap-0.5">
-                  <span className="text-[12.5px] font-semibold">Send to client</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">Email a copy once signed</span>
-                </Label>
-                <Switch id="send" checked={sendToClient} onCheckedChange={setSendToClient} />
-              </div>
-              {sendToClient && (
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="client@company.com"
-                  className="h-10 rounded-[9px]"
-                />
-              )}
-          </SettingsSection>
         </Card>
 
           <div className="flex shrink-0 items-center gap-2.5">

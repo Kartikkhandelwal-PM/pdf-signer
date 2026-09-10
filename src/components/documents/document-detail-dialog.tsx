@@ -48,9 +48,10 @@ interface DocumentDetailDialogProps {
   document: SignedDocument | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSend: (doc: SignedDocument) => void
 }
 
-export function DocumentDetailDialog({ document, open, onOpenChange }: DocumentDetailDialogProps) {
+export function DocumentDetailDialog({ document, open, onOpenChange, onSend }: DocumentDetailDialogProps) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
 
@@ -234,9 +235,10 @@ export function DocumentDetailDialog({ document, open, onOpenChange }: DocumentD
               </Button>
               <Button
                 className="h-10 gap-1.5 rounded-[10px] border-none bg-primary font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:bg-primary/90"
-                onClick={() =>
-                  toast(document.sentTo ? `Resent to ${document.sentTo}` : `Preparing to send ${document.name} to client`)
-                }
+                onClick={() => {
+                  onOpenChange(false)
+                  onSend(document)
+                }}
               >
                 <Send className="size-4" />
                 {document.sentTo ? 'Resend' : 'Send to client'}

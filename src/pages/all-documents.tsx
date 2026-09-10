@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 
 import { DocumentStatusBadge, documentStatusConfig } from '@/components/dashboard/status-badge'
 import { DocumentDetailDialog } from '@/components/documents/document-detail-dialog'
+import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -86,9 +87,10 @@ interface DocRowProps {
   onOpenDetail: (doc: SignedDocument) => void
   onVerify: (doc: SignedDocument) => void
   onResume: (doc: SignedDocument) => void
+  onSend: (doc: SignedDocument) => void
 }
 
-function DocRow({ doc, indented, onOpenDetail, onVerify, onResume }: DocRowProps) {
+function DocRow({ doc, indented, onOpenDetail, onVerify, onResume, onSend }: DocRowProps) {
   const unfinished = doc.status === 'draft'
   return (
     <TableRow className={cn('border-border hover:bg-secondary/30', indented && 'bg-secondary/10')}>
@@ -242,11 +244,7 @@ function DocRow({ doc, indented, onOpenDetail, onVerify, onResume }: DocRowProps
                 <Download />
                 Download
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  toast(doc.sentTo ? `Resent to ${doc.sentTo}` : `Preparing to send ${doc.name} to client`)
-                }
-              >
+              <DropdownMenuItem onClick={() => onSend(doc)}>
                 <Send />
                 {doc.sentTo ? 'Resend' : 'Send to client'}
               </DropdownMenuItem>
@@ -267,6 +265,7 @@ export function AllDocumentsPage() {
   const [page, setPage] = useState(0)
   const [activeDoc, setActiveDoc] = useState<SignedDocument | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
 
   function handleVerify(doc: SignedDocument) {
     navigate('/verify', { state: { documents: [doc] } })
@@ -500,6 +499,7 @@ export function AllDocumentsPage() {
                         onOpenDetail={setActiveDoc}
                         onVerify={handleVerify}
                         onResume={handleResume}
+                        onSend={(doc) => setSendTargets([doc])}
                       />
                     )
                   }
@@ -614,6 +614,19 @@ export function AllDocumentsPage() {
                               </TooltipTrigger>
                               <TooltipContent>Download all</TooltipContent>
                             </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-9 rounded-[9px] bg-primary/10 text-primary hover:bg-primary/15"
+                                  onClick={() => setSendTargets(docs)}
+                                >
+                                  <Send className="size-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{sentCount > 0 ? 'Resend batch' : 'Send batch'}</TooltipContent>
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -626,6 +639,7 @@ export function AllDocumentsPage() {
                             onOpenDetail={setActiveDoc}
                             onVerify={handleVerify}
                             onResume={handleResume}
+                            onSend={(d) => setSendTargets([d])}
                           />
                         ))}
                     </Fragment>
@@ -675,7 +689,16 @@ export function AllDocumentsPage() {
         document={activeDoc}
         open={activeDoc !== null}
         onOpenChange={(open) => !open && setActiveDoc(null)}
+        onSend={(doc) => setSendTargets([doc])}
       />
+
+      {sendTargets && (
+        <SendDialog
+          documents={sendTargets}
+          open={sendTargets !== null}
+          onOpenChange={(open) => !open && setSendTargets(null)}
+        />
+      )}
     </div>
   )
 }

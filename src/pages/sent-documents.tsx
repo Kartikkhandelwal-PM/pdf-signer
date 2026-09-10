@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,9 +58,10 @@ type Row = { kind: 'single'; doc: SignedDocument } | { kind: 'group'; batchName:
 interface SentRowProps {
   doc: SignedDocument
   indented?: boolean
+  onResend: (doc: SignedDocument) => void
 }
 
-function SentRow({ doc, indented }: SentRowProps) {
+function SentRow({ doc, indented, onResend }: SentRowProps) {
   const status = deliveryStatusFor(doc.id)
   const config = deliveryConfig[status]
   return (
@@ -87,7 +89,7 @@ function SentRow({ doc, indented }: SentRowProps) {
         </div>
       </TableCell>
       <TableCell className="max-w-56 truncate py-3.5 font-mono text-[12px] text-secondary-foreground">
-        {doc.sentTo}
+        {doc.recipientName ? `${doc.recipientName} · ${doc.sentTo}` : doc.sentTo}
       </TableCell>
       <TableCell className="py-3.5">
         <span
@@ -125,7 +127,7 @@ function SentRow({ doc, indented }: SentRowProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => toast(`Resent to ${doc.sentTo}`)}>
+              <DropdownMenuItem onClick={() => onResend(doc)}>
                 <RotateCw />
                 Resend
               </DropdownMenuItem>
@@ -148,6 +150,7 @@ function SentRow({ doc, indented }: SentRowProps) {
 export function SentDocumentsPage() {
   const { documents } = useDocuments()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
 
   // A batch send can go to one shared email or, via the per-file CSV, a different recipient
   // per file — either way, the files that went out together should read as one send, not as
@@ -232,7 +235,7 @@ export function SentDocumentsPage() {
                 )}
                 {rows.map((row) => {
                   if (row.kind === 'single') {
-                    return <SentRow key={row.doc.id} doc={row.doc} />
+                    return <SentRow key={row.doc.id} doc={row.doc} onResend={(doc) => setSendTargets([doc])} />
                   }
 
                   const { batchName, docs } = row
@@ -288,13 +291,7 @@ export function SentDocumentsPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="size-9 rounded-[9px] bg-secondary/60 hover:bg-secondary"
-                                  onClick={() =>
-                                    toast(
-                                      recipients.size === 1
-                                        ? `Resent to ${docs[0].sentTo}`
-                                        : `Resent to ${recipients.size} recipients`,
-                                    )
-                                  }
+                                  onClick={() => setSendTargets(docs)}
                                 >
                                   <RotateCw className="size-4" />
                                 </Button>
@@ -317,7 +314,10 @@ export function SentDocumentsPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                      {isOpen && docs.map((doc) => <SentRow key={doc.id} doc={doc} indented />)}
+                      {isOpen &&
+                        docs.map((doc) => (
+                          <SentRow key={doc.id} doc={doc} indented onResend={(d) => setSendTargets([d])} />
+                        ))}
                     </Fragment>
                   )
                 })}
@@ -326,6 +326,14 @@ export function SentDocumentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {sendTargets && (
+        <SendDialog
+          documents={sendTargets}
+          open={sendTargets !== null}
+          onOpenChange={(open) => !open && setSendTargets(null)}
+        />
+      )}
     </div>
   )
 }

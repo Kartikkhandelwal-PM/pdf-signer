@@ -3,10 +3,21 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { documents as initialDocuments } from '@/data/mock'
 import type { SignedDocument, VerifyStatus } from '@/types'
 
+export interface SendUpdate {
+  id: string
+  sentTo: string
+  recipientName?: string
+  // Only present when the send flow learned/confirmed a password for this document (e.g. from
+  // an uploaded recipient CSV) — merged in so it's remembered for next time, never cleared.
+  password?: string
+}
+
 interface DocumentsContextValue {
   documents: SignedDocument[]
   addDocuments: (docs: SignedDocument[]) => void
   markVerified: (id: string, status: VerifyStatus) => void
+  // Applied after a "Send to client" / "Resend" action for one or many documents at once.
+  sendDocuments: (updates: SendUpdate[]) => void
   // Finishing a draft document should replace that row, not leave a stale unsigned copy
   // sitting next to the newly signed one.
   replaceDocument: (oldId: string, next: SignedDocument) => void
@@ -39,6 +50,23 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     setDocuments((prev) => [next, ...prev.filter((doc) => doc.id !== oldId)])
   }, [])
 
+  const sendDocuments = useCallback((updates: SendUpdate[]) => {
+    const byId = new Map(updates.map((update) => [update.id, update]))
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        const update = byId.get(doc.id)
+        if (!update) return doc
+        return {
+          ...doc,
+          sentTo: update.sentTo,
+          recipientName: update.recipientName || doc.recipientName,
+          password: update.password ?? doc.password,
+          updatedAt: new Date().toISOString(),
+        }
+      }),
+    )
+  }, [])
+
   const saveDraftFile = useCallback((id: string, file: File) => {
     draftFilesRef.current.set(id, file)
   }, [])
@@ -50,8 +78,26 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ documents, addDocuments, markVerified, replaceDocument, saveDraftFile, getDraftFile, clearDraftFile }),
-    [documents, addDocuments, markVerified, replaceDocument, saveDraftFile, getDraftFile, clearDraftFile],
+    () => ({
+      documents,
+      addDocuments,
+      markVerified,
+      replaceDocument,
+      sendDocuments,
+      saveDraftFile,
+      getDraftFile,
+      clearDraftFile,
+    }),
+    [
+      documents,
+      addDocuments,
+      markVerified,
+      replaceDocument,
+      sendDocuments,
+      saveDraftFile,
+      getDraftFile,
+      clearDraftFile,
+    ],
   )
 
   return <DocumentsContext.Provider value={value}>{children}</DocumentsContext.Provider>

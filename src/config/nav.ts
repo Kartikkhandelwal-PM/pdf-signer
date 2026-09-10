@@ -2,7 +2,7 @@ import {
   FileCheck2,
   FileSignature,
   Files,
-  LayoutDashboard,
+  House,
   Send,
   Settings,
   ShieldCheck,
@@ -20,10 +20,18 @@ export interface NavItem {
 export const mainNav: NavItem[] = [
   {
     title: 'Dashboard',
-    path: '/',
-    icon: LayoutDashboard,
-    description: "Here's what's happening across your firm's document signing today.",
+    path: '/home',
+    icon: House,
+    description: 'Quick actions and your most recent documents, at a glance.',
   },
+  // Classic stats-and-tables dashboard — superseded by the Home page above, which now
+  // carries the "Dashboard" name. Kept here (commented, not deleted) in case we want it back.
+  // {
+  //   title: 'Dashboard',
+  //   path: '/',
+  //   icon: LayoutDashboard,
+  //   description: "Here's what's happening across your firm's document signing today.",
+  // },
   {
     title: 'Sign a document',
     path: '/sign',

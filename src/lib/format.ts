@@ -12,6 +12,22 @@ export function formatRelativeTime(iso: string): string {
   return `${diffDay}d ago`
 }
 
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
+
+export function getTimeOfDay(): TimeOfDay {
+  const hour = NOW.getHours()
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+export function getGreeting(): string {
+  const timeOfDay = getTimeOfDay()
+  if (timeOfDay === 'morning') return 'Good morning'
+  if (timeOfDay === 'afternoon') return 'Good afternoon'
+  return 'Good evening'
+}
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit',

@@ -175,3 +175,37 @@
     opacity: 0;
   }
 }
+
+/* Home hero's time-of-day icon badge — sunbeam glint, the moon's gentle bob, and the
+   glow-circle badge style's breathing halo. */
+@keyframes ray-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes moon-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.12);
+  }
+}

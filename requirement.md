@@ -14,3 +14,4 @@ the one thing always needs to be considered is we can never compromise with the 
 the dashboard, table, preview, toast, warnung anything and everything must be very very professional. 
 you can add other components that is required for the complete pdf signer module. 
 need to focus on UI and you can add mock data and flow
+we can not compromise with the good ui and design. looks matters the most.

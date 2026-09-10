@@ -20,6 +20,7 @@ export interface SignedDocument {
   passwordProtected: boolean
   password?: string
   sentTo?: string
+  recipientName?: string
   source?: DocumentSource
   batchName?: string
   lastVerifiedStatus?: VerifyStatus
