@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Check,
   KeyRound,
@@ -7,6 +8,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Star,
+  Trash2,
   Usb,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -27,10 +29,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { certificates as initialCertificates } from '@/data/mock'
-import { formatDate } from '@/lib/format'
+import { formatDate, NOW } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Certificate } from '@/types'
 
@@ -75,9 +78,32 @@ const FETCH_STAGES = [
   { label: 'Verifying with issuer…', icon: KeyRound },
 ] as const
 
+/** How long this certificate has left, said the way a signer thinks about it. */
+function expiryNote(expiresOn: string): { label: string; className: string } {
+  const days = Math.round((new Date(expiresOn).getTime() - NOW.getTime()) / 86_400_000)
+  if (days < 0) {
+    const past = Math.abs(days)
+    return {
+      label: past >= 60 ? `Expired ${Math.round(past / 30)} months ago` : `Expired ${past} days ago`,
+      className: 'text-destructive',
+    }
+  }
+  if (days <= 60) {
+    return { label: days === 0 ? 'Expires today' : `Expires in ${days} days`, className: 'text-warning' }
+  }
+  if (days < 365) return { label: `Expires in ${Math.round(days / 30)} months`, className: 'text-muted-foreground' }
+  const years = days / 365
+  return {
+    label: `Expires in ${years < 2 ? '1 year+' : `${Math.floor(years)} years`}`,
+    className: 'text-muted-foreground',
+  }
+}
+
 type FetchPhase = 'scanning' | 'found'
 
 export function CertificatesPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [certificates, setCertificates] = useState(initialCertificates)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [fetchPhase, setFetchPhase] = useState<FetchPhase>('scanning')
@@ -107,6 +133,14 @@ export function CertificatesPage() {
   useEffect(() => {
     if (dialogOpen) startFetch()
   }, [dialogOpen])
+
+  // Arrived from the dashboard's "Fetch certificate" button — open the scan straight away, then
+  // drop the flag so a refresh or a later Back doesn't reopen it.
+  useEffect(() => {
+    if (!(location.state as { startFetch?: boolean } | null)?.startFetch) return
+    setDialogOpen(true)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location, navigate])
 
   useEffect(() => {
     if (!dialogOpen || fetchPhase !== 'scanning') return
@@ -160,93 +194,119 @@ export function CertificatesPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {certificates.map((cert) => (
-          <Card
-            key={cert.id}
-            className="gap-4 rounded-2xl border border-border py-5 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0"
-          >
-            <CardContent className="flex flex-col gap-4 px-5">
-              <div className="flex items-start justify-between gap-2">
-                <div
-                  className={cn(
-                    'flex size-11 shrink-0 items-center justify-center rounded-[12px]',
-                    statusConfig[cert.status],
-                  )}
-                >
-                  <ShieldCheck className="size-5" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CertificateStatusBadge status={cert.status} />
+        {certificates.map((cert) => {
+          const expiry = expiryNote(cert.expiresOn)
+          return (
+            <Card
+              key={cert.id}
+              className={cn(
+                'flex h-full flex-col gap-0 overflow-hidden rounded-2xl border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0',
+                cert.isDefault ? 'border-primary/35' : 'border-border',
+              )}
+            >
+              <CardContent className="flex flex-1 flex-col gap-4 p-5">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      'flex size-11 shrink-0 items-center justify-center rounded-[12px]',
+                      statusConfig[cert.status],
+                    )}
+                  >
+                    <ShieldCheck className="size-5" />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-[14.5px] font-semibold">{cert.holderName}</span>
+                    <span className="truncate text-[12.5px] text-muted-foreground">{cert.organization}</span>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-8 rounded-[8px] bg-secondary/60 hover:bg-secondary"
+                        className="-mt-1 size-8 shrink-0 rounded-[8px] text-muted-foreground hover:bg-secondary"
                       >
                         <MoreHorizontal className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setDefault(cert.id)} disabled={cert.isDefault}>
-                        <Star />
+                    <DropdownMenuContent align="end" className="w-52 p-1.5">
+                      <DropdownMenuItem
+                        className="gap-2.5 px-2.5 py-2 text-[13px]"
+                        onClick={() => setDefault(cert.id)}
+                        disabled={cert.isDefault || cert.status === 'expired'}
+                      >
+                        <Star className="size-4 text-muted-foreground" />
                         Set as default
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator className="mx-0" />
                       <DropdownMenuItem
                         variant="destructive"
+                        className="gap-2.5 px-2.5 py-2 text-[13px] font-medium"
                         onClick={() => removeCertificate(cert.id)}
                       >
+                        <Trash2 className="size-4" />
                         Remove certificate
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
-                  {cert.holderName}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <CertificateStatusBadge status={cert.status} />
                   {cert.isDefault && (
-                    <span className="flex items-center gap-1 rounded-full bg-linear-to-br from-brand-orange to-brand-pink px-2 py-0.5 text-[9.5px] font-semibold text-white">
+                    <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
                       <Star className="size-2.5 fill-current" />
                       Default
                     </span>
                   )}
-                </span>
-                <span className="text-[12.5px] text-muted-foreground">{cert.organization}</span>
-              </div>
+                  <span className={cn('ml-auto text-[11.5px] font-medium', expiry.className)}>{expiry.label}</span>
+                </div>
 
-              <div className="flex flex-col gap-2 rounded-[10px] bg-secondary/50 p-3">
-                <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-muted-foreground">Issuer</span>
-                  <span className="font-medium">{cert.issuer}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-muted-foreground">Serial</span>
-                  <span className="font-mono">{cert.serialNumber}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-muted-foreground">Expires</span>
-                  <span className="font-mono font-medium">{formatDate(cert.expiresOn)}</span>
-                </div>
-              </div>
+                <dl className="flex flex-col gap-2 rounded-[10px] bg-secondary/50 p-3 text-[11.5px]">
+                  {[
+                    { label: 'Issuer', value: cert.issuer, mono: false },
+                    { label: 'Serial', value: cert.serialNumber, mono: true },
+                    { label: 'Valid until', value: formatDate(cert.expiresOn), mono: true },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-baseline justify-between gap-3">
+                      <dt className="shrink-0 text-muted-foreground">{row.label}</dt>
+                      <dd className={cn('min-w-0 truncate text-right font-medium', row.mono && 'font-mono')}>
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
 
-              {!cert.isDefault && cert.status !== 'expired' && (
-                <Button
-                  variant="ghost"
-                  className="h-9 w-full rounded-[10px] bg-secondary text-[12.5px] font-semibold hover:bg-secondary/70"
-                  onClick={() => setDefault(cert.id)}
-                >
-                  Set as default
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                {/* Every card ends on the same row, whatever state it is in, so a grid of them
+                    reads as a set rather than three unrelated boxes. */}
+                <div className="mt-auto pt-1">
+                  {cert.isDefault ? (
+                    <div className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-primary/[0.07] text-[12.5px] font-semibold text-primary">
+                      <Check className="size-3.5" />
+                      Signs by default
+                    </div>
+                  ) : cert.status === 'expired' ? (
+                    <div className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-secondary/60 text-[12.5px] font-medium text-muted-foreground">
+                      Renew to use for signing
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="h-9 w-full rounded-[10px] bg-secondary text-[12.5px] font-semibold hover:bg-secondary/70"
+                      onClick={() => setDefault(cert.id)}
+                    >
+                      <Star className="size-3.5" />
+                      Set as default
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
 
         <button
           onClick={() => setDialogOpen(true)}
-          className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border text-center transition-colors hover:border-primary/40 hover:bg-secondary/40"
+          className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border text-center transition-colors hover:border-primary/40 hover:bg-secondary/40"
         >
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10">
             <Usb className="size-5 text-primary" />

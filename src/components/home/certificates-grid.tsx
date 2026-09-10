@@ -1,6 +1,5 @@
-import { Plus, ShieldCheck, Star } from 'lucide-react'
+import { ShieldCheck, Star, Usb } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { CertificateStatusBadge } from '@/components/dashboard/status-badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +23,9 @@ const iconClassName: Record<Certificate['status'], string> = {
 
 export function CertificatesGrid() {
   const navigate = useNavigate()
-  const fetchCertificate = () => toast('Upload a .pfx certificate or connect a USB token.')
+  // Fetching lives on the certificates page; this is the same action, so it goes there and
+  // opens the scan rather than running a second, shallower version of it here.
+  const fetchCertificate = () => navigate('/certificates', { state: { startFetch: true } })
 
   return (
     <Card className="gap-0 overflow-hidden rounded-2xl border border-border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0">
@@ -39,7 +40,7 @@ export function CertificatesGrid() {
             className="h-7 gap-1.5 rounded-[9px] px-3 text-[12px] font-semibold shadow-none"
             onClick={fetchCertificate}
           >
-            <Plus className="size-3" />
+            <Usb className="size-3" />
             Fetch certificate
           </Button>
         </CardAction>
