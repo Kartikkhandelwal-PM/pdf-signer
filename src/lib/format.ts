@@ -16,18 +16,44 @@ export function formatRelativeTime(iso: string): string {
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
 
-export function getTimeOfDay(): TimeOfDay {
-  const hour = NOW.getHours()
-  if (hour < 12) return 'morning'
-  if (hour < 17) return 'afternoon'
+// Hour boundaries the greeting flips on — shared with useTimeOfDay so the hook knows exactly
+// when to schedule its next update.
+export const AFTERNOON_HOUR = 12
+export const EVENING_HOUR = 17
+
+// Unlike everything else here, this is about the person reading the screen rather than about
+// the sample data — so it reads the real clock, not the pinned NOW. Callers that need to
+// reason about a specific moment (the hook below) can pass one in.
+export function getTimeOfDay(at: Date = new Date()): TimeOfDay {
+  const hour = at.getHours()
+  if (hour < AFTERNOON_HOUR) return 'morning'
+  if (hour < EVENING_HOUR) return 'afternoon'
   return 'evening'
 }
 
-export function getGreeting(): string {
-  const timeOfDay = getTimeOfDay()
-  if (timeOfDay === 'morning') return 'Good morning'
-  if (timeOfDay === 'afternoon') return 'Good afternoon'
-  return 'Good evening'
+export const GREETING_BY_TIME: Record<TimeOfDay, string> = {
+  morning: 'Good morning',
+  afternoon: 'Good afternoon',
+  evening: 'Good evening',
+}
+
+// The next instant the greeting changes — noon, then 5pm, then midnight. Kept next to the
+// boundaries themselves so the two can't drift apart.
+export function nextTimeOfDayBoundary(from: Date = new Date()): Date {
+  const next = new Date(from)
+  next.setMinutes(0, 0, 0)
+  const hour = from.getHours()
+
+  if (hour < AFTERNOON_HOUR) {
+    next.setHours(AFTERNOON_HOUR)
+  } else if (hour < EVENING_HOUR) {
+    next.setHours(EVENING_HOUR)
+  } else {
+    next.setHours(0)
+    next.setDate(next.getDate() + 1)
+  }
+
+  return next
 }
 
 export function formatDate(iso: string): string {

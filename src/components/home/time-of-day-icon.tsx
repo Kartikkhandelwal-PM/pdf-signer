@@ -1,4 +1,4 @@
-import { getTimeOfDay, type TimeOfDay } from '@/lib/format'
+import { type TimeOfDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const glowClassName: Record<TimeOfDay, string> = {
@@ -121,8 +121,9 @@ const glyphByTime: Record<TimeOfDay, () => React.JSX.Element> = {
   evening: SunsetGlyph,
 }
 
-export function TimeOfDayIcon() {
-  const timeOfDay = getTimeOfDay()
+// The current time of day is passed in rather than read here, so the icon and the greeting
+// beside it always come from the same reading of the clock.
+export function TimeOfDayIcon({ timeOfDay }: { timeOfDay: TimeOfDay }) {
   const Glyph = glyphByTime[timeOfDay]
 
   return (

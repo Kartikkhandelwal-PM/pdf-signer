@@ -1,7 +1,12 @@
 import { TimeOfDayIcon } from '@/components/home/time-of-day-icon'
-import { getGreeting } from '@/lib/format'
+import { useTimeOfDay } from '@/hooks/use-time-of-day'
+import { GREETING_BY_TIME } from '@/lib/format'
 
 export function HeroBanner() {
+  // One reading of the clock drives both the greeting and the icon, so they can never
+  // disagree about which part of the day it is.
+  const timeOfDay = useTimeOfDay()
+
   return (
     <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#0f3a52] via-primary to-[#2f93c0] px-6 py-5 shadow-[0_16px_36px_-20px_rgba(15,58,82,.55)] sm:px-8 sm:py-6">
       <div className="pointer-events-none absolute -top-14 -right-8 size-48 rounded-full bg-brand-teal/20 blur-3xl" />
@@ -9,10 +14,10 @@ export function HeroBanner() {
 
       <div className="relative flex items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <TimeOfDayIcon />
+          <TimeOfDayIcon timeOfDay={timeOfDay} />
           <div className="flex flex-col gap-1">
             <h1 className="flex items-center gap-2 font-heading text-[20px] font-bold tracking-tight text-white sm:text-[22px]">
-              {getGreeting()}, Kartik
+              {GREETING_BY_TIME[timeOfDay]}, Kartik
               <span aria-hidden>👋</span>
             </h1>
             <p className="max-w-sm text-[13px] text-white/75">
