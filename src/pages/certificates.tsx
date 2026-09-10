@@ -110,6 +110,19 @@ export function CertificatesPage() {
   const [fetchStep, setFetchStep] = useState(0)
   const [foundCerts, setFoundCerts] = useState<Certificate[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+
+  // Picked out of the global search — ring the card that was asked for and scroll it into
+  // view, then let the highlight fade so it doesn't read as a permanent selection.
+  useEffect(() => {
+    const incoming = (location.state as { highlightId?: string } | null)?.highlightId
+    if (!incoming) return
+
+    setHighlightId(incoming)
+    document.querySelector(`[data-cert-id="${incoming}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const timer = setTimeout(() => setHighlightId(null), 2600)
+    return () => clearTimeout(timer)
+  }, [location.state])
 
   function setDefault(id: string) {
     setCertificates((prev) => prev.map((c) => ({ ...c, isDefault: c.id === id })))
@@ -199,9 +212,11 @@ export function CertificatesPage() {
           return (
             <Card
               key={cert.id}
+              data-cert-id={cert.id}
               className={cn(
-                'flex h-full flex-col gap-0 overflow-hidden rounded-2xl border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0',
+                'flex h-full flex-col gap-0 overflow-hidden rounded-2xl border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0 transition-shadow',
                 cert.isDefault ? 'border-primary/35' : 'border-border',
+                highlightId === cert.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
               )}
             >
               <CardContent className="flex flex-1 flex-col gap-4 p-5">

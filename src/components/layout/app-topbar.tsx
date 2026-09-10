@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { ChevronDown, CreditCard, LogOut, Plus, Search, Settings, UserRound } from 'lucide-react'
+import { ChevronDown, CreditCard, LogOut, Plus, Settings, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -13,40 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
+import { GlobalSearch } from './global-search'
 import { ModeToggle } from './mode-toggle'
 
 export function AppTopbar() {
   const navigate = useNavigate()
-  const searchRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== '/') return
-      const target = e.target as HTMLElement | null
-      const isTyping =
-        target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-      if (isTyping) return
-      e.preventDefault()
-      searchRef.current?.focus()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
   return (
     <header className="sticky top-0 z-10 flex h-[72px] shrink-0 items-center gap-4 border-b bg-background/80 px-5 backdrop-blur supports-backdrop-filter:bg-background/60 sm:px-7">
-      <div className="relative hidden max-w-sm flex-1 md:block">
-        <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          ref={searchRef}
-          placeholder="Search documents, recipients, certificates…"
-          className="h-10 rounded-[10px] bg-secondary/60 pr-10 pl-10"
-        />
-        <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-[6px] border border-border bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-          /
-        </kbd>
-      </div>
+      <GlobalSearch />
 
       <div className="ml-auto flex items-center gap-2.5">
         <Button

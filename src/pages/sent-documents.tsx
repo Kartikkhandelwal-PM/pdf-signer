@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   CalendarClock,
   ChevronDown,
@@ -17,6 +17,7 @@ import {
   Search,
   Send,
 } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
@@ -179,13 +180,24 @@ function SentRow({ doc, indented, onResend, onPreview }: SentRowProps) {
 }
 
 export function SentDocumentsPage() {
+  const location = useLocation()
   const { documents } = useDocuments()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
   const [previewDoc, setPreviewDoc] = useState<SignedDocument | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState((location.state as { query?: string } | null)?.query ?? '')
   const [delivery, setDelivery] = useState<DeliveryStatus | 'all'>('all')
   const [period, setPeriod] = useState<Period>('all')
+
+  // Picking a recipient in the global search lands here already narrowed to them, with the
+  // other filters cleared so nothing hides the rows that were just asked for.
+  useEffect(() => {
+    const incoming = (location.state as { query?: string } | null)?.query
+    if (typeof incoming !== 'string') return
+    setQuery(incoming)
+    setDelivery('all')
+    setPeriod('all')
+  }, [location.state])
 
   const sent = useMemo(() => documents.filter((doc) => doc.sentTo), [documents])
 

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   ChevronDown,
   ChevronLeft,
@@ -17,7 +17,7 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { DocumentStatusBadge, documentStatusConfig } from '@/components/dashboard/status-badge'
@@ -256,16 +256,44 @@ function DocRow({ doc, indented, onOpenDetail, onVerify, onResume, onSend }: Doc
   )
 }
 
+interface IncomingSearch {
+  query?: string
+  openDocumentId?: string
+}
+
 export function AllDocumentsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { documents } = useDocuments()
-  const [query, setQuery] = useState('')
+  const incoming = location.state as IncomingSearch | null
+  const [query, setQuery] = useState(incoming?.query ?? '')
   const [status, setStatus] = useState<DocumentStatus | 'all'>('all')
   const [source, setSource] = useState<DocumentSource | 'all'>('all')
   const [page, setPage] = useState(0)
   const [activeDoc, setActiveDoc] = useState<SignedDocument | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
+
+  // Arriving from the global search: filter down to what was picked, and open it outright if
+  // the hit was one specific document. Keyed on location.state so landing here again from a
+  // second search re-applies, while typing in the page's own box is left alone.
+  useEffect(() => {
+    const state = location.state as IncomingSearch | null
+    if (!state?.query && !state?.openDocumentId) return
+
+    if (typeof state.query === 'string') {
+      setQuery(state.query)
+      setStatus('all')
+      setSource('all')
+      setPage(0)
+    }
+    if (state.openDocumentId) {
+      const match = documents.find((doc) => doc.id === state.openDocumentId)
+      if (match) setActiveDoc(match)
+    }
+    // Re-running on every documents change would re-open a preview the user just closed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   function handleVerify(doc: SignedDocument) {
     navigate('/verify', { state: { documents: [doc] } })
