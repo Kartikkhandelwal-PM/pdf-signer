@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { DocumentStatusBadge, documentStatusConfig } from '@/components/dashboard/status-badge'
-import { DocumentDetailDialog } from '@/components/documents/document-detail-dialog'
+import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
 import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -686,7 +686,7 @@ export function AllDocumentsPage() {
         </div>
       </Card>
 
-      <DocumentDetailDialog
+      <DocumentPreviewDialog
         document={activeDoc}
         open={activeDoc !== null}
         onOpenChange={(open) => !open && setActiveDoc(null)}

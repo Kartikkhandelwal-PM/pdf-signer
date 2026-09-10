@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
 import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -98,9 +99,10 @@ interface SentRowProps {
   doc: SignedDocument
   indented?: boolean
   onResend: (doc: SignedDocument) => void
+  onPreview: (doc: SignedDocument) => void
 }
 
-function SentRow({ doc, indented, onResend }: SentRowProps) {
+function SentRow({ doc, indented, onResend, onPreview }: SentRowProps) {
   return (
     <TableRow className={cn('border-border', indented && 'bg-secondary/10 hover:bg-secondary/20')}>
       <TableCell className={cn('py-3.5 pl-6', indented && 'pl-14')}>
@@ -142,7 +144,7 @@ function SentRow({ doc, indented, onResend }: SentRowProps) {
                 variant="ghost"
                 size="icon"
                 className="size-9 rounded-[9px] bg-secondary/60 hover:bg-secondary"
-                onClick={() => toast(`Opening preview — ${doc.name}`)}
+                onClick={() => onPreview(doc)}
               >
                 <Eye className="size-4" />
               </Button>
@@ -180,6 +182,7 @@ export function SentDocumentsPage() {
   const { documents } = useDocuments()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<SignedDocument | null>(null)
   const [query, setQuery] = useState('')
   const [delivery, setDelivery] = useState<DeliveryStatus | 'all'>('all')
   const [period, setPeriod] = useState<Period>('all')
@@ -401,7 +404,14 @@ export function SentDocumentsPage() {
                 )}
                 {rows.map((row) => {
                   if (row.kind === 'single') {
-                    return <SentRow key={row.doc.id} doc={row.doc} onResend={(doc) => setSendTargets([doc])} />
+                    return (
+                      <SentRow
+                        key={row.doc.id}
+                        doc={row.doc}
+                        onResend={(doc) => setSendTargets([doc])}
+                        onPreview={setPreviewDoc}
+                      />
+                    )
                   }
 
                   const { batchName, docs } = row
@@ -489,7 +499,13 @@ export function SentDocumentsPage() {
                       </TableRow>
                       {isOpen &&
                         docs.map((doc) => (
-                          <SentRow key={doc.id} doc={doc} indented onResend={(d) => setSendTargets([d])} />
+                          <SentRow
+                            key={doc.id}
+                            doc={doc}
+                            indented
+                            onResend={(d) => setSendTargets([d])}
+                            onPreview={setPreviewDoc}
+                          />
                         ))}
                     </Fragment>
                   )
@@ -508,6 +524,13 @@ export function SentDocumentsPage() {
           </div>
         )}
       </Card>
+
+      <DocumentPreviewDialog
+        document={previewDoc}
+        open={previewDoc !== null}
+        onOpenChange={(open) => !open && setPreviewDoc(null)}
+        onSend={(doc) => setSendTargets([doc])}
+      />
 
       {sendTargets && (
         <SendDialog
