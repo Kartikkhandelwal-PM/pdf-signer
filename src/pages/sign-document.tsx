@@ -25,6 +25,7 @@ import {
   FileText,
   FileWarning,
   Fingerprint,
+  FolderUp,
   KeyRound,
   Layers,
   ListChecks,
@@ -68,6 +69,7 @@ import { RadioGroup } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { useDocuments } from '@/context/documents-context'
 import { certificates } from '@/data/mock'
+import { resolveIncomingFiles } from '@/lib/file-intake'
 import { checkPdfPassword, loadPdfDocument } from '@/lib/pdf'
 import { cn } from '@/lib/utils'
 import type { SignedDocument } from '@/types'
@@ -1296,6 +1298,19 @@ export function SignDocumentPage() {
     }
   }
 
+  // Same intake as the FileDropzone (expands .zip archives, keeps only PDFs) for the compact
+  // "+ Add" inputs elsewhere in the flow, which are plain <input type="file"> rather than a
+  // full dropzone.
+  async function addPickedFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const resolved = await resolveIncomingFiles(Array.from(fileList))
+    if (resolved.length === 0) {
+      toast.error('No PDF files found')
+      return
+    }
+    addFiles(resolved)
+  }
+
   function removeFile(id: string) {
     setFiles((prev) => prev.filter((f) => f.id !== id))
   }
@@ -2373,17 +2388,42 @@ export function SignDocumentPage() {
                 )}
               </div>
               {phase === 'setup' && (
-                <label className="flex shrink-0 cursor-pointer items-center gap-1 rounded-[10px] bg-secondary px-3 py-2 text-[12px] font-semibold text-primary hover:bg-secondary/70">
-                  <Plus className="size-3.5" />
-                  Add
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => e.target.files && addFiles(Array.from(e.target.files))}
-                  />
-                </label>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <label className="flex cursor-pointer items-center gap-1 rounded-[10px] bg-secondary px-3 py-2 text-[12px] font-semibold text-primary hover:bg-secondary/70">
+                    <Plus className="size-3.5" />
+                    Add
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf,.zip,application/zip,application/x-zip-compressed"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        void addPickedFiles(e.target.files)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <label
+                    title="Add a folder of PDFs"
+                    className="flex size-[30px] cursor-pointer items-center justify-center rounded-[10px] bg-secondary text-primary hover:bg-secondary/70"
+                  >
+                    <FolderUp className="size-3.5" />
+                    <span className="sr-only">Add a folder of PDFs</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      ref={(el) => {
+                        el?.setAttribute('webkitdirectory', '')
+                        el?.setAttribute('directory', '')
+                      }}
+                      onChange={(e) => {
+                        void addPickedFiles(e.target.files)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                </div>
               )}
             </div>
 
@@ -3186,10 +3226,33 @@ export function SignDocumentPage() {
               Add another file
               <input
                 type="file"
-                accept="application/pdf"
+                accept="application/pdf,.pdf,.zip,application/zip,application/x-zip-compressed"
                 multiple
                 className="hidden"
-                onChange={(e) => e.target.files && addFiles(Array.from(e.target.files))}
+                onChange={(e) => {
+                  void addPickedFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            <label
+              title="Add a folder of PDFs"
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-secondary px-4 text-[12.5px] font-semibold text-primary hover:bg-secondary/70"
+            >
+              <FolderUp className="size-3.5" />
+              Add a folder
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                ref={(el) => {
+                  el?.setAttribute('webkitdirectory', '')
+                  el?.setAttribute('directory', '')
+                }}
+                onChange={(e) => {
+                  void addPickedFiles(e.target.files)
+                  e.target.value = ''
+                }}
               />
             </label>
             <Button
