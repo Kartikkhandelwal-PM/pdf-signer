@@ -1,17 +1,16 @@
 import { useState } from 'react'
-import { Building2, Mail, SendHorizonal, Settings as SettingsIcon, Upload } from 'lucide-react'
+import { Building2, Mail, Settings as SettingsIcon, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/layout/page-header'
+import { EmailDeliverySettings } from '@/components/settings/email-delivery'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type SettingsTab = 'firm' | 'smtp'
-type Encryption = 'tls' | 'ssl' | 'none'
 
 function Field({
   id,
@@ -34,7 +33,6 @@ function Field({
 
 export function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('firm')
-  const [encryption, setEncryption] = useState<Encryption>('tls')
   const [logoName, setLogoName] = useState('')
 
   return (
@@ -54,7 +52,7 @@ export function SettingsPage() {
           {(
             [
               { value: 'firm', label: 'Firm profile', icon: Building2 },
-              { value: 'smtp', label: 'SMTP configuration', icon: Mail },
+              { value: 'smtp', label: 'Email delivery', icon: Mail },
             ] as { value: SettingsTab; label: string; icon: typeof Building2 }[]
           ).map((item) => (
             <TabsTrigger
@@ -135,76 +133,7 @@ export function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="smtp" className="mt-0">
-          <Card className="gap-5 rounded-2xl border border-border py-6 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0">
-            <CardHeader className="px-6">
-              <CardTitle className="text-[15px] font-semibold">SMTP configuration</CardTitle>
-              <CardDescription className="text-[12.5px]">
-                Used to send signed documents and notifications to your clients.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5 px-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_140px]">
-                <Field id="smtp-host" label="SMTP host">
-                  <Input id="smtp-host" placeholder="smtp.zoho.in" className="h-10 rounded-[9px] font-mono" />
-                </Field>
-                <Field id="smtp-port" label="Port">
-                  <Input id="smtp-port" defaultValue="587" className="h-10 rounded-[9px] font-mono" />
-                </Field>
-              </div>
-  
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field id="smtp-user" label="Username">
-                  <Input id="smtp-user" placeholder="notifications@kdksoftware.com" className="h-10 rounded-[9px]" />
-                </Field>
-                <Field id="smtp-pass" label="Password">
-                  <Input id="smtp-pass" type="password" placeholder="••••••••" className="h-10 rounded-[9px]" />
-                </Field>
-                <Field id="from-name" label="From name">
-                  <Input id="from-name" defaultValue="KDK Softwares" className="h-10 rounded-[9px]" />
-                </Field>
-                <Field id="from-email" label="From email">
-                  <Input id="from-email" placeholder="no-reply@kdksoftware.com" className="h-10 rounded-[9px]" />
-                </Field>
-              </div>
-  
-              <div className="flex flex-col gap-2">
-                <Label className="text-[12.5px] font-semibold">Encryption</Label>
-                <RadioGroup
-                  value={encryption}
-                  onValueChange={(v) => setEncryption(v as Encryption)}
-                  className="grid grid-cols-3 gap-2.5"
-                >
-                  {(['tls', 'ssl', 'none'] as Encryption[]).map((option) => (
-                    <div
-                      key={option}
-                      onClick={() => setEncryption(option)}
-                      className="flex cursor-pointer items-center gap-2 rounded-[9px] border border-border px-3 py-2.5 text-[12.5px] font-medium uppercase"
-                    >
-                      <RadioGroupItem value={option} />
-                      {option}
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-  
-              <div className="flex justify-end gap-2.5">
-                <Button
-                  variant="ghost"
-                  className="h-10 gap-1.5 rounded-[10px] bg-secondary px-4 font-semibold hover:bg-secondary/70"
-                  onClick={() => toast('Test email sent to contact@kdksoftware.com')}
-                >
-                  <SendHorizonal className="size-4" />
-                  Send test email
-                </Button>
-                <Button
-                  className="h-10 gap-1.5 rounded-[10px] border-none bg-primary px-5 font-semibold shadow-[0_4px_10px_-4px_rgba(29,110,150,.45)] hover:bg-primary/90"
-                  onClick={() => toast.success('SMTP settings saved')}
-                >
-                  Save changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <EmailDeliverySettings />
         </TabsContent>
       </Tabs>
     </div>
