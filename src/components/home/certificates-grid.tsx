@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { EmptyState } from '@/components/shared/empty-state'
 import { certificates } from '@/data/mock'
 import { cn } from '@/lib/utils'
 import type { Certificate } from '@/types'
@@ -47,17 +48,12 @@ export function CertificatesGrid() {
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5 p-3.5">
         {certificates.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2.5 px-5 py-8 text-center">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <ShieldCheck className="size-5" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[12.5px] font-semibold">No certificates saved yet</span>
-              <span className="text-[11px] text-muted-foreground">
-                Add a DSC certificate to start signing documents.
-              </span>
-            </div>
-          </div>
+          <EmptyState
+            size="sm"
+            icon={ShieldCheck}
+            title="No certificates saved yet"
+            description="Add a DSC certificate to start signing documents."
+          />
         ) : (
           certificates.map((cert) => (
             <button

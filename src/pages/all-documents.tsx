@@ -24,6 +24,7 @@ import { DocumentStatusBadge, documentStatusConfig } from '@/components/dashboar
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
 import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -295,6 +296,15 @@ export function AllDocumentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
 
+  const filtersActive = query.trim().length > 0 || status !== 'all' || source !== 'all'
+
+  function clearFilters() {
+    setQuery('')
+    setStatus('all')
+    setSource('all')
+    setPage(0)
+  }
+
   function handleVerify(doc: SignedDocument) {
     navigate('/verify', { state: { documents: [doc] } })
   }
@@ -514,8 +524,40 @@ export function AllDocumentsPage() {
               <TableBody>
                 {pageItems.length === 0 && (
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableCell colSpan={6} className="py-16 text-center text-[13px] text-muted-foreground">
-                      No documents match your filters.
+                    <TableCell colSpan={6} className="p-0">
+                      {documents.length === 0 ? (
+                        <EmptyState
+                          icon={Files}
+                          title="No documents yet"
+                          description="Sign your first PDF and it'll appear here, along with everything your firm sends out."
+                          action={
+                            <Button
+                              className="h-9 gap-1.5 rounded-[10px] border-none bg-primary px-4 text-[12.5px] font-semibold hover:bg-primary/90"
+                              onClick={() => navigate('/sign')}
+                            >
+                              <FileSignature className="size-4" />
+                              Sign a document
+                            </Button>
+                          }
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title="No documents match your filters"
+                          description="Try a different search, or widen the status and source filters."
+                          action={
+                            filtersActive ? (
+                              <Button
+                                variant="ghost"
+                                className="h-9 rounded-[10px] bg-secondary px-4 text-[12.5px] font-semibold hover:bg-secondary/70"
+                                onClick={clearFilters}
+                              >
+                                Clear filters
+                              </Button>
+                            ) : undefined
+                          }
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 )}

@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { DocumentStatusBadge } from '@/components/dashboard/status-badge'
+import { EmptyState } from '@/components/shared/empty-state'
 import { useDocuments } from '@/context/documents-context'
 import { formatRelativeTime } from '@/lib/format'
 
@@ -38,17 +39,12 @@ export function RecentDocumentsList() {
       </CardHeader>
       <CardContent className="divide-y divide-border px-0">
         {recentDocuments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <FileSignature className="size-6" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[13.5px] font-semibold">No documents yet</span>
-              <span className="text-[12px] text-muted-foreground">
-                Sign your first document and it'll show up here.
-              </span>
-            </div>
-          </div>
+          <EmptyState
+            icon={FileSignature}
+            title="No documents yet"
+            description="Sign your first document and it'll show up here."
+            className="py-10"
+          />
         ) : (
           recentDocuments.map((doc) => (
             <button

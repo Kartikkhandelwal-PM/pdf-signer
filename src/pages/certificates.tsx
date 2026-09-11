@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 
 import { CertificateStatusBadge } from '@/components/dashboard/status-badge'
 import { PageHeader } from '@/components/layout/page-header'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -206,6 +207,25 @@ export function CertificatesPage() {
         }
       />
 
+      {certificates.length === 0 && (
+        <Card className="rounded-2xl border border-border py-0 shadow-[0_1px_2px_rgba(20,32,42,.03),0_8px_20px_-16px_rgba(20,77,105,.14)] ring-0">
+          <EmptyState
+            icon={ShieldCheck}
+            title="No certificates saved yet"
+            description="Plug in your DSC token and fetch its certificate — you'll need one saved here before you can sign anything."
+            action={
+              <Button
+                className="h-9 gap-1.5 rounded-[10px] border-none bg-primary px-4 text-[12.5px] font-semibold hover:bg-primary/90"
+                onClick={() => setDialogOpen(true)}
+              >
+                <Usb className="size-4" />
+                Fetch a certificate
+              </Button>
+            }
+          />
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {certificates.map((cert) => {
           const expiry = expiryNote(cert.expiresOn)
@@ -319,18 +339,22 @@ export function CertificatesPage() {
           )
         })}
 
-        <button
-          onClick={() => setDialogOpen(true)}
-          className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border text-center transition-colors hover:border-primary/40 hover:bg-secondary/40"
-        >
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10">
-            <Usb className="size-5 text-primary" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[13.5px] font-semibold">Fetch a certificate</span>
-            <span className="text-[12px] text-muted-foreground">Reads it straight from your connected token</span>
-          </div>
-        </button>
+        {/* The add tile sits alongside existing cards. With none saved, the empty state above
+            already carries this same action, so showing both would just ask twice. */}
+        {certificates.length > 0 && (
+          <button
+            onClick={() => setDialogOpen(true)}
+            className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border text-center transition-colors hover:border-primary/40 hover:bg-secondary/40"
+          >
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10">
+              <Usb className="size-5 text-primary" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[13.5px] font-semibold">Fetch a certificate</span>
+              <span className="text-[12px] text-muted-foreground">Reads it straight from your connected token</span>
+            </div>
+          </button>
+        )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -6,6 +6,7 @@ import {
   Download,
   Eye,
   FileText,
+  Files,
   Layers,
   ListFilter,
   Lock,
@@ -17,12 +18,13 @@ import {
   Search,
   Send,
 } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
 import { SendDialog } from '@/components/documents/send-dialog'
 import { PageHeader } from '@/components/layout/page-header'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -181,6 +183,7 @@ function SentRow({ doc, indented, onResend, onPreview }: SentRowProps) {
 
 export function SentDocumentsPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { documents } = useDocuments()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sendTargets, setSendTargets] = useState<SignedDocument[] | null>(null)
@@ -396,21 +399,40 @@ export function SentDocumentsPage() {
               <TableBody>
                 {rows.length === 0 && (
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableCell colSpan={5} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="text-[13px] text-muted-foreground">
-                          {sent.length === 0 ? "Nothing's been sent yet." : 'No sent document matches these filters.'}
-                        </span>
-                        {sent.length > 0 && filtersActive && (
-                          <button
-                            type="button"
-                            onClick={clearFilters}
-                            className="text-[12.5px] font-semibold text-primary hover:underline"
-                          >
-                            Clear filters
-                          </button>
-                        )}
-                      </div>
+                    <TableCell colSpan={5} className="p-0">
+                      {sent.length === 0 ? (
+                        <EmptyState
+                          icon={Send}
+                          title="Nothing's been sent yet"
+                          description="Once you email a signed document to a client, its delivery, opens and downloads show up here."
+                          action={
+                            <Button
+                              className="h-9 gap-1.5 rounded-[10px] border-none bg-primary px-4 text-[12.5px] font-semibold hover:bg-primary/90"
+                              onClick={() => navigate('/documents')}
+                            >
+                              <Files className="size-4" />
+                              Pick a document to send
+                            </Button>
+                          }
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title="No sent document matches these filters"
+                          description="Try a different search, or widen the delivery and date filters."
+                          action={
+                            filtersActive ? (
+                              <Button
+                                variant="ghost"
+                                className="h-9 rounded-[10px] bg-secondary px-4 text-[12.5px] font-semibold hover:bg-secondary/70"
+                                onClick={clearFilters}
+                              >
+                                Clear filters
+                              </Button>
+                            ) : undefined
+                          }
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
